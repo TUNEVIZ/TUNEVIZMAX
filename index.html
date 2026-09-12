@@ -1,0 +1,1484 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>TuneViz MAX</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+  <style>
+/* 
+  _____ _   _ _  _ ___  __   _____ ____  __  __   _   __  __
+ |_   _| | | | \| | __| \ \ / /_ _|_  / |  \/  | /_\  \ \/ /
+   | | | |_| | .` | _|   \ V / | | / /  | |\/| |/ _ \  >  < 
+   |_|  \___/|_|\_|___|   \_/ |___/___| |_|  |_/_/ \_\/_/\_\
+Produced by Xiren, TUNE‑Viz Series
+*/
+    :root {
+      --glass-opacity: 0.45;
+      --glass-bg: rgba(20, 20, 35, var(--glass-opacity));
+      --glass-bg-hover: rgba(30, 30, 50, calc(var(--glass-opacity) + 0.2));
+      --glass-border: rgba(255, 255, 255, 0.15);
+      --text-primary: rgba(255, 255, 255, 0.92);
+      --text-secondary: rgba(255, 255, 255, 0.6);
+    }
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{
+      width:100vw;height:100vh;overflow:hidden;
+      background:radial-gradient(ellipse at center,#0b0b1a 0%,#03030a 100%);
+      font-family:'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+      user-select:none;-webkit-user-select:none;
+    }
+    #three-canvas{position:fixed;inset:0;z-index:1}
+    #ui-layer{
+      position:fixed;inset:0;z-index:10;pointer-events:none;
+      display:flex;flex-direction:column;justify-content:space-between;padding:20px 30px;
+    }
+    .top-panel{pointer-events:auto;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}
+    .glass-card{
+      background:var(--glass-bg);backdrop-filter:blur(28px) saturate(180%);
+      -webkit-backdrop-filter:blur(28px) saturate(180%);border:1px solid var(--glass-border);
+      border-radius:18px;padding:14px 20px;box-shadow:0 15px 35px rgba(0,0,0,0.5);
+      display:flex;align-items:center;gap:12px;transition:all 0.3s ease;cursor:pointer;
+    }
+    .glass-card:hover{background:var(--glass-bg-hover);transform:translateY(-2px)}
+    .album-art{
+      width:48px;height:48px;border-radius:10px;background:linear-gradient(135deg,#1e2a3a,#0f0f1e);
+      display:flex;align-items:center;justify-content:center;font-size:26px;
+      border:1px solid rgba(255,255,255,0.2);
+    }
+    .album-art.playing{animation:glowPulse 2s infinite}
+    @keyframes glowPulse{0%,100%{box-shadow:0 0 20px rgba(92,156,230,0.5)}50%{box-shadow:0 0 40px rgba(240,123,92,0.8)}}
+    .track-info{display:flex;flex-direction:column;gap:2px;min-width:0}
+    .track-title{color:var(--text-primary);font-size:1.1rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
+    .track-artist{color:var(--text-secondary);font-size:0.85rem}
+    .time-display{color:var(--text-secondary);font-family:monospace;font-size:0.8rem}
+    .mode-switch-group{
+      display:flex;gap:4px;background:var(--glass-bg);backdrop-filter:blur(28px);
+      border:1px solid var(--glass-border);border-radius:14px;padding:4px;pointer-events:auto;
+    }
+    .mode-btn{
+      padding:8px 18px;border-radius:10px;border:none;cursor:pointer;font-size:0.85rem;font-weight:500;
+      background:transparent;color:var(--text-secondary);transition:all 0.2s ease;
+    }
+    .mode-btn:hover{color:white}
+    .mode-btn.active{background:rgba(40,40,65,0.8);color:white;box-shadow:0 4px 10px rgba(0,0,0,0.3)}
+    .progress-container{
+      pointer-events:auto;width:100%;max-width:700px;margin:0 auto;background:var(--glass-bg);
+      backdrop-filter:blur(20px);border:1px solid var(--glass-border);border-radius:30px;
+      padding:10px 18px;box-shadow:0 15px 35px rgba(0,0,0,0.4);display:flex;align-items:center;gap:10px;
+    }
+    .progress-bar-bg{flex:1;height:6px;background:rgba(255,255,255,0.12);border-radius:10px;cursor:pointer;position:relative;overflow:hidden}
+    .progress-fill{height:100%;width:0%;background:linear-gradient(90deg,#5c9ce6,#a78bfa,#f07b5c);border-radius:10px;box-shadow:0 0 15px rgba(92,156,230,0.8);transition:width 0.05s linear}
+    .bottom-panel{pointer-events:auto;display:flex;align-items:center;justify-content:center;gap:20px;flex-wrap:wrap}
+    .control-btn{
+      width:48px;height:48px;border-radius:50%;background:var(--glass-bg);backdrop-filter:blur(28px);
+      border:1px solid var(--glass-border);box-shadow:0 10px 25px rgba(0,0,0,0.4);
+      display:flex;align-items:center;justify-content:center;cursor:pointer;color:white;font-size:1.3rem;
+      transition:all 0.3s ease;
+    }
+    .control-btn:hover{background:var(--glass-bg-hover);transform:scale(1.05)}
+    .control-btn:active{transform:scale(0.95)}
+    .play-btn{width:62px;height:62px;font-size:1.8rem;background:linear-gradient(135deg,rgba(92,156,230,0.6),rgba(160,120,240,0.6))}
+    #fileInput{position:absolute;opacity:0;pointer-events:none;width:0;height:0;overflow:hidden}
+    .playlist-fab{
+      position:fixed;bottom:30px;right:30px;z-index:25;pointer-events:auto;
+      width:56px;height:56px;border-radius:50%;background:var(--glass-bg);backdrop-filter:blur(24px);
+      border:1px solid var(--glass-border);box-shadow:0 10px 30px rgba(0,0,0,0.5);
+      display:flex;align-items:center;justify-content:center;cursor:pointer;color:white;font-size:1.8rem;
+    }
+    .playlist-fab:hover{transform:scale(1.1);background:var(--glass-bg-hover)}
+    .playlist-panel{
+      position:fixed;bottom:100px;right:30px;z-index:24;pointer-events:none;
+      width:300px;max-height:400px;background:var(--glass-bg);
+      backdrop-filter:blur(30px);border:1px solid var(--glass-border);
+      border-radius:18px;box-shadow:0 15px 35px rgba(0,0,0,0.6);
+      padding:10px;display:none;flex-direction:column;gap:4px;overflow-y:auto;
+    }
+    .playlist-panel.open{display:flex;pointer-events:auto;animation:slideInRight 0.3s ease-out}
+    .playlist-panel.closing{animation:slideOutRight 0.3s ease-in forwards}
+    @keyframes slideInRight{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:translateX(0)}}
+    @keyframes slideOutRight{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(30px)}}
+    .playlist-item{
+      padding:10px 14px;border-radius:12px;cursor:pointer;color:var(--text-primary);
+      font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+      transition:background 0.2s ease,transform 0.2s ease;background:rgba(255,255,255,0.05);border:1px solid transparent;
+    }
+    .playlist-item:hover{background:var(--glass-bg-hover);border-color:rgba(255,255,255,0.2);transform:translateX(5px)}
+    .playlist-item.active{background:rgba(92,156,230,0.3);border-color:#5c9ce6;color:white}
+    .playlist-overlay{position:fixed;inset:0;z-index:23;display:none;pointer-events:auto;background:transparent;backdrop-filter:blur(2px)}
+    .playlist-overlay.active{display:block}
+    .settings-panel{
+      position:fixed;right:-400px;top:0;bottom:0;width:360px;background:rgba(10,10,25,0.9);
+      backdrop-filter:blur(40px);border-left:1px solid var(--glass-border);
+      z-index:20;padding:25px 20px;transition:right 0.4s cubic-bezier(0.4,0,0.2,1);overflow-y:auto;
+      display:flex;flex-direction:column;gap:18px;pointer-events:auto;
+    }
+    .settings-panel.open{right:0}
+    .settings-header{display:flex;justify-content:space-between;align-items:center}
+    .settings-title{color:white;font-size:1.3rem}
+    .settings-close-btn{background:none;border:1px solid rgba(255,255,255,0.2);color:white;width:32px;height:32px;border-radius:8px;cursor:pointer}
+    .setting-group{display:flex;flex-direction:column;gap:6px}
+    .setting-label{color:var(--text-secondary);font-size:0.75rem;text-transform:uppercase}
+    .setting-slider{width:100%;height:5px;background:rgba(255,255,255,0.2);border-radius:5px;-webkit-appearance:none}
+    .setting-slider::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;background:white;border-radius:50%}
+    .setting-check{display:flex;align-items:center;gap:8px;color:white;font-size:0.9rem}
+    .perf-mode-label{color:#ff8a65;font-weight:600}
+    .setting-divider{height:1px;background:rgba(255,255,255,0.1);margin:4px 0}
+    .audio-processing-section{background:rgba(255,255,255,0.05);border-radius:12px;padding:12px}
+    .audio-processing-title{color:white;font-size:0.9rem;font-weight:600;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+    .reset-btn{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:white;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.7rem}
+    .perf-monitor{
+      position:fixed;left:30px;bottom:90px;z-index:26;
+      background:rgba(10,10,20,0.8);backdrop-filter:blur(12px);
+      border:1px solid rgba(255,255,255,0.2);border-radius:12px;
+      padding:8px 14px;color:rgba(255,255,255,0.9);font-family:monospace;
+      font-size:0.75rem;line-height:1.4;pointer-events:auto;cursor:grab;
+      user-select:none;transition:font-size 0.3s ease,padding 0.3s ease;
+      box-shadow:0 8px 20px rgba(0,0,0,0.4);touch-action:none;
+    }
+    .perf-monitor.perf-large{font-size:0.9rem;padding:10px 18px}
+    .perf-monitor:active{cursor:grabbing}
+    .perf-monitor span{display:block;white-space:nowrap}
+    .toast{
+      position:fixed;top:30px;left:50%;transform:translateX(-50%);
+      background:rgba(200,60,60,0.9);color:white;padding:12px 24px;
+      border-radius:8px;font-size:0.9rem;z-index:100;pointer-events:none;
+      opacity:0;transition:opacity 0.3s ease,transform 0.3s ease;
+      box-shadow:0 4px 15px rgba(0,0,0,0.4);
+    }
+    .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+    .debug-panel{
+      position:fixed;top:30px;left:30px;z-index:27;
+      background:rgba(0,0,0,0.9);backdrop-filter:blur(10px);
+      border:1px solid rgba(255,255,255,0.3);border-radius:8px;
+      padding:12px;font-family:monospace;font-size:0.7rem;color:#0f0;
+      pointer-events:auto;display:none;min-width:280px;max-height:70vh;
+      overflow-y:auto;box-shadow:0 4px 15px rgba(0,0,0,0.3);white-space:pre-wrap;
+    }
+    .debug-panel.visible{display:block}
+    .debug-log-btn{
+      background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);
+      color:white;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.7rem;margin-top:8px;
+    }
+    .debug-log-btn:hover{background:rgba(255,255,255,0.2)}
+    .debug-log-content{
+      margin-top:8px;padding:8px;background:rgba(0,0,0,0.5);
+      border-radius:4px;max-height:200px;overflow-y:auto;display:none;
+    }
+    .debug-log-content.open{display:block}
+    .playlist-tabs{display:flex;gap:4px;margin-bottom:8px;}
+    .playlist-tab{padding:6px 12px;border-radius:8px;cursor:pointer;font-size:0.8rem;background:rgba(255,255,255,0.05);color:var(--text-secondary);border:1px solid transparent;transition:all 0.2s ease;}
+    .playlist-tab:hover{background:rgba(255,255,255,0.1)}
+    .playlist-tab.active{background:rgba(92,156,230,0.3);color:white;border-color:#5c9ce6;}
+    .lyric-color-picker{display:flex;align-items:center;gap:8px;}
+    .lyric-color-picker input[type="color"]{width:40px;height:30px;border:none;border-radius:4px;cursor:pointer;background:none;}
+    .style-btn{
+      background:rgba(255,255,255,0.1);
+      border:1px solid rgba(255,255,255,0.2);
+      color:white;
+      padding:10px 16px;
+      border-radius:8px;
+      cursor:pointer;
+      font-size:0.9rem;
+      transition:all 0.2s ease;
+      width:100%;
+      text-align:center;
+    }
+    .style-btn:hover{background:rgba(255,255,255,0.2)}
+  </style>
+</head>
+<body>
+  <canvas id="three-canvas"></canvas>
+  <input type="file" id="fileInput" multiple>
+
+  <div id="ui-layer">
+    <div class="top-panel">
+      <div class="glass-card" id="songCard">
+        <div class="album-art" id="albumArt">🎵</div>
+        <div class="track-info">
+          <div class="track-title" id="trackTitle">未选择音频</div>
+          <div class="track-artist" id="trackArtist">点击右下角📂批量导入</div>
+          <div class="time-display" id="timeDisplay">00:00 / 00:00</div>
+        </div>
+      </div>
+      <div class="mode-switch-group">
+        <button class="mode-btn active" data-mode="particle">粒子</button>
+        <button class="mode-btn" data-mode="spectrum">频谱</button>
+        <button class="mode-btn" data-mode="both">混合</button>
+        <button class="mode-btn" data-mode="vinyl">黑胶</button>
+      </div>
+    </div>
+    <div style="flex:1;"></div>
+    <div class="progress-container">
+      <span style="color:white;font-family:monospace" id="currentTimeLabel">00:00</span>
+      <div class="progress-bar-bg" id="progressBarBg"><div class="progress-fill" id="progressFill"></div></div>
+      <span style="color:white;font-family:monospace" id="durationLabel">00:00</span>
+    </div>
+    <div class="bottom-panel">
+      <button class="control-btn" id="btnPrev">⏮️</button>
+      <button class="control-btn play-btn" id="btnPlay">▶️</button>
+      <button class="control-btn" id="btnNext">⏭️</button>
+      <button class="control-btn" id="btnSettings">⚙️</button>
+      <button class="control-btn" id="btnLoadFile">📂</button>
+    </div>
+  </div>
+
+  <div class="playlist-overlay" id="playlistOverlay"></div>
+  <div class="playlist-fab" id="playlistFab">🎶</div>
+  <div class="playlist-panel" id="playlistPanel"></div>
+  <div class="perf-monitor" id="perfMonitor"><span>FPS: --</span><span>CPU: --%</span><span>MEM: --</span></div>
+  <div class="debug-panel" id="debugPanel"></div>
+  <div class="toast" id="toast"></div>
+
+  <div class="settings-panel" id="settingsPanel">
+    <div class="settings-header"><span class="settings-title">设置</span><button class="settings-close-btn" id="btnCloseSettings">✕</button></div>
+    <div class="setting-group"><span class="setting-label">玻璃透明度</span><input type="range" class="setting-slider" id="glassOpacity" min="0.1" max="0.9" value="0.45" step="0.05"></div>
+    <div class="setting-group"><span class="setting-label">粒子数量</span><input type="range" class="setting-slider" id="particleCount" min="1000" max="20000" value="8000" step="100"></div>
+    <div class="setting-group"><span class="setting-label">粒子大小</span><input type="range" class="setting-slider" id="particleSize" min="0.1" max="2" value="0.7" step="0.05"></div>
+    <div class="setting-group"><span class="setting-label">频谱柱数</span><input type="range" class="setting-slider" id="barCount" min="64" max="1000" value="512" step="8"></div>
+    <div class="setting-group"><span class="setting-label">频谱灵敏度</span><input type="range" class="setting-slider" id="spectrumGain" min="0.5" max="8" value="4.0" step="0.1"></div>
+    <div class="setting-group"><span class="setting-label">频谱平滑</span><input type="range" class="setting-slider" id="spectrumSmooth" min="0.1" max="0.95" value="0.55" step="0.01"></div>
+    <div class="setting-group"><span class="setting-label">震动强度</span><input type="range" class="setting-slider" id="shakeIntensity" min="0" max="2" value="0.8" step="0.1"></div>
+    <div class="setting-group"><span class="setting-label">歌词颜色</span><div class="lyric-color-picker"><input type="color" id="lyricColor" value="#ffffff"></div></div>
+    <div class="setting-check"><input type="checkbox" id="lyricToggle">显示歌词</div>
+    <div class="setting-check"><input type="checkbox" id="bloomToggle" checked>辉光</div>
+    <div class="setting-check"><input type="checkbox" id="shakeToggle" checked>鼓点震动</div>
+    <div class="setting-check"><input type="checkbox" id="autoRotateToggle" checked>自动旋转</div>
+    <div class="setting-check"><input type="checkbox" id="debugToggle">Debug模式</div>
+    <div class="setting-divider"></div>
+    <div class="setting-check"><input type="checkbox" id="perfModeToggle"><span class="perf-mode-label">⚡ 性能模式</span></div>
+    <div style="color:var(--text-secondary);font-size:0.7rem;margin-top:-12px;padding-left:26px;">柱子上限10000 · 粒子50000 · 灵敏度x20 · 震动x5</div>
+    <div class="setting-divider"></div>
+    <div class="audio-processing-section">
+      <div class="audio-processing-title">音频处理<button class="reset-btn" id="resetAudioBtn">复位</button></div>
+      <div class="setting-group"><span class="setting-label">声伴比例</span><input type="range" class="setting-slider" id="vocalMix" min="-1" max="1" value="0" step="0.01"></div>
+      <div class="setting-group" style="margin-top:10px;"><span class="setting-label">左右声道平衡</span><input type="range" class="setting-slider" id="balanceSlider" min="-1" max="1" value="0" step="0.01"></div>
+      <div class="setting-group" style="margin-top:10px;"><span class="setting-label">音调</span><input type="range" class="setting-slider" id="pitchSlider" min="0.5" max="1.5" value="1.0" step="0.01"></div>
+    </div>
+    <div class="setting-divider"></div>
+    <button class="style-btn" id="styleSwitchBtn">切换播放器样式（整体）</button>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+    import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+    import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+    import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+
+    const ShakeShader = {
+      uniforms: { tDiffuse:{value:null}, uShakeX:{value:0}, uShakeY:{value:0} },
+      vertexShader:`varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+      fragmentShader:`uniform sampler2D tDiffuse; uniform float uShakeX,uShakeY; varying vec2 vUv; void main(){ vec2 uv=vUv+vec2(uShakeX,uShakeY); gl_FragColor=texture2D(tDiffuse,uv); }`
+    };
+
+    const PERF_LIMITS = {
+      particleCount: { defaultMax: 20000, perfMax: 50000 },
+      particleSize: { defaultMax: 2, perfMax: 5 },
+      barCount: { defaultMax: 1000, perfMax: 10000 },
+      spectrumGain: { defaultMax: 8, perfMax: 20 },
+      shakeIntensity: { defaultMax: 2, perfMax: 5 }
+    };
+
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      if (!toast) return;
+      toast.textContent = message;
+      toast.classList.add('show');
+      clearTimeout(toast._hideTimer);
+      toast._hideTimer = setTimeout(() => toast.classList.remove('show'), 3000);
+    }
+
+    function parseLRC(text) {
+      const lines = text.split(/\r?\n/);
+      const result = [];
+      for (const line of lines) {
+        const match = line.match(/\[(\d{2}):(\d{2})\.(\d{1,3})\](.*)/);
+        if (match) {
+          const minutes = parseInt(match[1]);
+          const seconds = parseInt(match[2]);
+          const millis = parseInt(match[3].padEnd(3, '0'));
+          const time = minutes * 60 + seconds + millis / 1000;
+          const lyric = match[4].trim();
+          result.push({ time, lyric });
+        }
+      }
+      return result.sort((a, b) => a.time - b.time);
+    }
+
+    function readFileAsText(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsText(file, 'UTF-8');
+      });
+    }
+
+    class AudioEngine {
+      constructor() {
+        this.ctx=null; this.source=null; this.element=null;
+        this.analyser=null; this.stereoPanner=null;
+        this.splitter=null; this.midGain=null; this.sideGain=null;
+        this.midSum=null; this.sideDiff=null; this.midMerger=null; this.sideMerger=null;
+        this.sideLeft=null; this.sideRight=null;
+        this.freqData=null; this.timeData=null;
+        this.fftSize=2048; this.isPlaying=false;
+        this.duration=0;
+        this._startTime=0; this._pauseTime=0;
+        this._playbackRate=1.0;
+        this._pitchDebounceTimer=null;
+        this.beatThreshold=0.75; this.beatCooldown=0;
+        this.energyHistory=[]; this.beatCallback=null;
+        this._playAttempted = false;
+      }
+      async init() {
+        if (this.ctx) return;
+        try {
+          this.ctx = new AudioContext();
+          this.analyser = this.ctx.createAnalyser();
+          this.analyser.fftSize = this.fftSize;
+          this.analyser.smoothingTimeConstant = 0.8;
+          this.freqData = new Uint8Array(this.analyser.frequencyBinCount);
+          this.timeData = new Uint8Array(this.analyser.fftSize);
+          this.element = new Audio();
+          this.element.crossOrigin = 'anonymous';
+          this.source = this.ctx.createMediaElementSource(this.element);
+          this.source.connect(this.analyser);
+          this.splitter = this.ctx.createChannelSplitter(2);
+          this.analyser.connect(this.splitter);
+          const gainL_mid = this.ctx.createGain(); gainL_mid.gain.value = 0.5;
+          const gainR_mid = this.ctx.createGain(); gainR_mid.gain.value = 0.5;
+          const gainL_side = this.ctx.createGain(); gainL_side.gain.value = 0.5;
+          const gainR_side = this.ctx.createGain(); gainR_side.gain.value = -0.5;
+          this.midSum = this.ctx.createGain();
+          this.sideDiff = this.ctx.createGain();
+          this.splitter.connect(gainL_mid, 0);
+          this.splitter.connect(gainR_mid, 1);
+          this.splitter.connect(gainL_side, 0);
+          this.splitter.connect(gainR_side, 1);
+          gainL_mid.connect(this.midSum);
+          gainR_mid.connect(this.midSum);
+          gainL_side.connect(this.sideDiff);
+          gainR_side.connect(this.sideDiff);
+          this.midMerger = this.ctx.createChannelMerger(2);
+          this.midSum.connect(this.midMerger, 0, 0);
+          this.midSum.connect(this.midMerger, 0, 1);
+          this.sideMerger = this.ctx.createChannelMerger(2);
+          this.sideLeft = this.ctx.createGain();
+          this.sideRight = this.ctx.createGain();
+          this.sideLeft.gain.value = 1;
+          this.sideRight.gain.value = -1;
+          this.sideDiff.connect(this.sideLeft);
+          this.sideDiff.connect(this.sideRight);
+          this.sideLeft.connect(this.sideMerger, 0, 0);
+          this.sideRight.connect(this.sideMerger, 0, 1);
+          this.midGain = this.ctx.createGain();
+          this.sideGain = this.ctx.createGain();
+          this.midMerger.connect(this.midGain);
+          this.sideMerger.connect(this.sideGain);
+          this.stereoPanner = this.ctx.createStereoPanner();
+          this.midGain.connect(this.stereoPanner);
+          this.sideGain.connect(this.stereoPanner);
+          this.stereoPanner.connect(this.ctx.destination);
+          this.setVocalMix(0);
+          this.setBalance(0);
+          this.setPitch(1.0);
+        } catch (err) { showToast('音频初始化失败: ' + err.message); }
+      }
+      unlock() {
+        if (!this.ctx) return;
+        if (this.ctx.state === 'suspended') {
+          this.ctx.resume().catch(()=>{});
+        }
+      }
+      async getDuration(file) {
+        await this.init();
+        return new Promise((resolve, reject) => {
+          const tempAudio = new Audio();
+          tempAudio.preload = 'metadata';
+          const url = URL.createObjectURL(file);
+          tempAudio.src = url;
+          tempAudio.load();
+          tempAudio.onloadedmetadata = () => { const dur = tempAudio.duration; URL.revokeObjectURL(url); resolve(dur); };
+          tempAudio.onerror = () => { URL.revokeObjectURL(url); reject(new Error(`无法解码: ${file.name}`)); };
+        });
+      }
+      playFile(file) {
+        if (!this.ctx) return;
+        this.unlock();
+        const url = URL.createObjectURL(file);
+        this.element.src = url;
+        try {
+          const playPromise = this.element.play();
+          if (playPromise !== undefined) {
+            playPromise.then(() => {
+              this.isPlaying = true;
+              this._startTime = performance.now();
+              this._pauseTime = 0;
+              this.updatePlayButton(true);
+              this._playAttempted = false;
+            }).catch(err => {
+              this.isPlaying = false;
+              this.updatePlayButton(false);
+              showToast('播放失败: ' + err.message);
+            });
+          }
+        } catch (err) {
+          showToast('播放失败: ' + err.message);
+          this.updatePlayButton(false);
+        }
+        this.element.onloadedmetadata = () => {
+          this.duration = this.element.duration;
+          document.getElementById('durationLabel').textContent = this.fmt(this.duration);
+        };
+      }
+      play() {
+        if (!this.ctx) return;
+        this.unlock();
+        try {
+          const playPromise = this.element.play();
+          if (playPromise !== undefined) {
+            playPromise.then(() => {
+              this.isPlaying = true;
+              this._startTime = performance.now() - (this._pauseTime * 1000 / this._playbackRate);
+              this.updatePlayButton(true);
+              this._playAttempted = false;
+            }).catch(err => {
+              const msg = err.message || '';
+              if (msg.includes('not allowed') || msg.includes('denied') || msg.includes('permission')) {
+                this.isPlaying = false;
+                this.updatePlayButton(false);
+                if (!this._playAttempted) {
+                  this._playAttempted = true;
+                  showToast('请点击播放按钮开始播放');
+                }
+              } else {
+                showToast('播放失败: ' + err.message);
+                this.updatePlayButton(false);
+              }
+            });
+          }
+        } catch (err) {
+          showToast('播放失败: ' + err.message);
+          this.updatePlayButton(false);
+        }
+      }
+      pause() {
+        this.element.pause();
+        this.isPlaying = false;
+        this._pauseTime = this.element.currentTime;
+        this.updatePlayButton(false);
+      }
+      getTime() {
+        if (this.isPlaying) {
+          const elapsed = (performance.now() - this._startTime) * this._playbackRate / 1000;
+          return Math.min(this.duration, Math.max(0, this._pauseTime + elapsed));
+        } else return this._pauseTime;
+      }
+      getProgress() { return this.duration ? Math.min(this.getTime()/this.duration,1) : 0; }
+      setTime(seconds) {
+        this.element.currentTime = seconds;
+        this._pauseTime = seconds;
+        if (this.isPlaying) this._startTime = performance.now();
+      }
+      updatePlayButton(playing) {
+        document.getElementById('btnPlay').textContent = playing ? '⏸️' : '▶️';
+        if (playing) document.getElementById('albumArt').classList.add('playing');
+        else document.getElementById('albumArt').classList.remove('playing');
+      }
+      fmt(s) { const m=Math.floor(s/60), sec=Math.floor(s%60); return `${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`; }
+      updateFreq() { this.analyser?.getByteFrequencyData(this.freqData); }
+      updateTime() { this.analyser?.getByteTimeDomainData(this.timeData); }
+      detectBeat() {
+        if (!this.timeData || this.beatCooldown>0) { this.beatCooldown--; return false; }
+        let sum=0;
+        for (let i=0;i<this.timeData.length;i++){ const v=(this.timeData[i]-128)/128; sum+=v*v; }
+        const energy=Math.sqrt(sum/this.timeData.length);
+        this.energyHistory.push(energy);
+        if (this.energyHistory.length>43) this.energyHistory.shift();
+        if (this.energyHistory.length<43) return false;
+        const avg=this.energyHistory.reduce((a,b)=>a+b,0)/this.energyHistory.length;
+        if (energy>avg*1.4 && energy>this.beatThreshold) { this.beatCooldown=8; this.beatCallback?.(energy); return true; }
+        return false;
+      }
+      setBalance(val) { if (this.stereoPanner) this.stereoPanner.pan.value = val; }
+      setVocalMix(val) {
+        if (this.midGain && this.sideGain) {
+          const midGain = 1 - Math.max(0, -val);
+          const sideGain = 1 - Math.max(0, val);
+          this.midGain.gain.value = midGain;
+          this.sideGain.gain.value = sideGain;
+        }
+      }
+      setPitch(val) {
+        if (this._pitchDebounceTimer) clearTimeout(this._pitchDebounceTimer);
+        this._pitchDebounceTimer = setTimeout(() => {
+          this._playbackRate = val;
+          if (this.element) {
+            const currentTime = this.getTime();
+            this.element.playbackRate = val;
+            this._pauseTime = currentTime;
+            if (this.isPlaying) this._startTime = performance.now();
+          }
+        }, 150);
+      }
+    }
+
+    class Playlist {
+      constructor(audioEngine, onSongChange) {
+        this.audio = audioEngine;
+        this.songs = [];
+        this.lyrics = [];
+        this.currentIndex = -1;
+        this.currentLyricIndex = -1;
+        this.onSongChange = onSongChange;
+        this.coverCallback = null;
+        this.lyricCallback = null;
+        this.activeTab = 'songs';
+        this.loadedIndex = -1;
+      }
+      async addFiles(files) {
+        let addedSong = 0;
+        let addedLyric = 0;
+        for (const file of files) {
+          const fileName = file.name.toLowerCase();
+          if (fileName.endsWith('.lrc')) {
+            try {
+              const text = await readFileAsText(file);
+              const parsed = parseLRC(text);
+              if (parsed.length > 0) {
+                this.lyrics.push({ name: file.name.replace(/\.lrc$/i, ''), data: parsed });
+                addedLyric++;
+              } else {
+                showToast('LRC解析失败或为空: ' + file.name);
+              }
+            } catch (e) { showToast('读取LRC失败: ' + file.name); }
+          } else {
+            try {
+              const duration = await this.audio.getDuration(file);
+              this.songs.push({ name: file.name.replace(/\.[^/.]+$/, ''), file, duration });
+              addedSong++;
+            } catch (e) { showToast(e.message); }
+          }
+        }
+        if (addedSong > 0 && this.currentIndex === -1) {
+          this.currentIndex = 0;
+        }
+        if (addedLyric > 0) {
+          if (this.currentLyricIndex === -1) this.applyLyric(0);
+          const lyricToggle = document.getElementById('lyricToggle');
+          if (lyricToggle && !lyricToggle.checked) {
+            lyricToggle.checked = true;
+            this.lyricToggleEvent?.();
+          }
+        }
+        this.renderPanel();
+        if (addedSong > 0) showToast('已导入歌曲，点击播放按钮开始播放');
+      }
+      playSong(index) {
+        if (index < 0 || index >= this.songs.length) return;
+        this.currentIndex = index;
+        const song = this.songs[index];
+        this.audio.playFile(song.file);
+        this.loadedIndex = index;
+        this.onSongChange?.(song);
+        this.renderPanel();
+        if (this.coverCallback) this.coverCallback(null);
+        if (song.file.name.toLowerCase().endsWith('.mp3')) this.extractMP3Cover(song.file);
+      }
+      applyLyric(index) {
+        if (index < 0 || index >= this.lyrics.length) return;
+        this.currentLyricIndex = index;
+        if (this.lyricCallback) this.lyricCallback(this.lyrics[index].data);
+        this.renderPanel();
+      }
+      async extractMP3Cover(file) {
+        if (window.jsmediatags) {
+          window.jsmediatags.read(file, {
+            onSuccess: (tag) => {
+              const image = tag.tags.picture;
+              if (image && image.data && image.data.length > 0) {
+                const blob = new Blob([new Uint8Array(image.data)], { type: image.format });
+                const url = URL.createObjectURL(blob);
+                if (this.coverCallback) this.coverCallback(url);
+              }
+            },
+            onError: (error) => showToast('封面提取失败: ' + error.message)
+          });
+        }
+      }
+      next() { if (this.songs.length) this.playSong((this.currentIndex+1)%this.songs.length); }
+      prev() { if (this.songs.length) this.playSong((this.currentIndex-1+this.songs.length)%this.songs.length); }
+      setTab(tab) { this.activeTab = tab; this.renderPanel(); }
+      renderPanel() {
+        const panel = document.getElementById('playlistPanel');
+        panel.innerHTML = '';
+        const tabs = document.createElement('div');
+        tabs.className = 'playlist-tabs';
+        const songsTab = document.createElement('div');
+        songsTab.className = 'playlist-tab' + (this.activeTab === 'songs' ? ' active' : '');
+        songsTab.textContent = '歌曲';
+        songsTab.addEventListener('click', () => { this.setTab('songs'); });
+        const lyricsTab = document.createElement('div');
+        lyricsTab.className = 'playlist-tab' + (this.activeTab === 'lyrics' ? ' active' : '');
+        lyricsTab.textContent = '歌词';
+        lyricsTab.addEventListener('click', () => { this.setTab('lyrics'); });
+        tabs.appendChild(songsTab);
+        tabs.appendChild(lyricsTab);
+        panel.appendChild(tabs);
+        if (this.activeTab === 'songs') {
+          if (this.songs.length === 0) {
+            panel.innerHTML += '<div style="color:white;padding:10px;text-align:center;">暂无歌曲</div>';
+          } else {
+            this.songs.forEach((song, i) => {
+              const item = document.createElement('div');
+              item.className = 'playlist-item' + (i === this.currentIndex ? ' active' : '');
+              item.textContent = song.name;
+              item.title = song.name;
+              item.addEventListener('click', (e) => { e.stopPropagation(); this.playSong(i); });
+              panel.appendChild(item);
+            });
+          }
+        } else {
+          if (this.lyrics.length === 0) {
+            panel.innerHTML += '<div style="color:white;padding:10px;text-align:center;">暂无歌词</div>';
+          } else {
+            this.lyrics.forEach((lyric, i) => {
+              const item = document.createElement('div');
+              item.className = 'playlist-item' + (i === this.currentLyricIndex ? ' active' : '');
+              item.textContent = lyric.name;
+              item.title = lyric.name;
+              item.addEventListener('click', (e) => { e.stopPropagation(); this.applyLyric(i); });
+              panel.appendChild(item);
+            });
+          }
+        }
+      }
+      togglePanel() {
+        const panel = document.getElementById('playlistPanel');
+        const overlay = document.getElementById('playlistOverlay');
+        if (panel.classList.contains('open')) {
+          panel.classList.add('closing');
+          panel.classList.remove('open');
+          overlay.classList.remove('active');
+          setTimeout(() => { panel.classList.remove('closing'); panel.style.display = 'none'; }, 300);
+        } else {
+          this.renderPanel();
+          panel.style.display = 'flex';
+          panel.classList.add('open');
+          overlay.classList.add('active');
+        }
+      }
+    }
+
+    class ParticleSystem {
+      constructor(scene) {
+        this.scene=scene; this.count=8000; this.visible=true;
+        this.geo=new THREE.BufferGeometry(); this.points=null;
+        this.pos=null; this.col=null; this.siz=null; this.vel=null; this.life=null;
+        this.trails=[]; this.maxLife=3.2;
+        this.hasCover = false; this.coverSampleFunc = null;
+        this.init();
+      }
+      init() {
+        if (this.points) { this.scene.remove(this.points); this.points.geometry.dispose(); this.points.material.dispose(); }
+        this.trails.forEach(t=>{ this.scene.remove(t.line); t.line.geometry.dispose(); t.line.material.dispose(); });
+        this.trails=[];
+        const n=this.count;
+        this.pos=new Float32Array(n*3); this.col=new Float32Array(n*3); this.siz=new Float32Array(n);
+        this.vel=new Float32Array(n*3); this.life=new Float32Array(n);
+        for(let i=0;i<n;i++) this.reset(i,true);
+        this.geo=new THREE.BufferGeometry();
+        this.geo.setAttribute('position',new THREE.BufferAttribute(this.pos,3));
+        this.geo.setAttribute('color',new THREE.BufferAttribute(this.col,3));
+        this.geo.setAttribute('size',new THREE.BufferAttribute(this.siz,1));
+        this.mat=new THREE.ShaderMaterial({
+          uniforms:{uPixelRatio:{value:Math.min(devicePixelRatio,2)}},
+          vertexShader:`attribute float size; attribute vec3 color; varying vec3 vColor; uniform float uPixelRatio;
+            void main(){ vec4 mv=modelViewMatrix*vec4(position,1.0); gl_PointSize=size*uPixelRatio*(180.0/-mv.z); gl_Position=projectionMatrix*mv; vColor=color; }`,
+          fragmentShader:`varying vec3 vColor; void main(){ float d=length(gl_PointCoord-0.5); if(d>0.5) discard; gl_FragColor=vec4(vColor,0.5); }`,
+          transparent:true, depthWrite:false, blending:THREE.AdditiveBlending
+        });
+        this.points=new THREE.Points(this.geo,this.mat);
+        this.points.visible = this.visible;
+        this.scene.add(this.points);
+        const trailMat = new THREE.LineBasicMaterial({color:0x5577aa, transparent:true, opacity:0.1, blending:THREE.AdditiveBlending});
+        for (let i=0; i<Math.min(100,this.count); i++) {
+          const g = new THREE.BufferGeometry(); const arr = new Float32Array(6*3);
+          g.setAttribute('position', new THREE.BufferAttribute(arr,3)); g.setDrawRange(0,0);
+          const line = new THREE.Line(g, trailMat); line.frustumCulled=false;
+          this.scene.add(line); this.trails.push({line, pos:arr, hist:[]});
+        }
+      }
+      reset(i,rz){
+        const i3=i*3, r=6+Math.random()*10, th=Math.random()*Math.PI*2, ph=Math.acos(2*Math.random()-1);
+        this.pos[i3]=Math.cos(th)*Math.sin(ph)*r; this.pos[i3+1]=Math.sin(th)*Math.sin(ph)*r*0.6;
+        this.pos[i3+2]=rz?(Math.random()-0.5)*18:Math.cos(ph)*r;
+        if (this.hasCover && this.coverSampleFunc) {
+          const nx = (this.pos[i3] / 10 + 1) / 2;
+          const ny = (this.pos[i3+1] / 10 + 1) / 2;
+          const color = this.coverSampleFunc(nx, ny);
+          this.col[i3] = color.r; this.col[i3+1] = color.g; this.col[i3+2] = color.b;
+        } else {
+          const c=new THREE.Color().setHSL(0.58+Math.random()*0.25,0.8,0.6);
+          this.col[i3]=c.r; this.col[i3+1]=c.g; this.col[i3+2]=c.b;
+        }
+        this.siz[i]=0.08+Math.random()*0.5;
+        this.vel[i3]=(Math.random()-0.5)*0.012; this.vel[i3+1]=(Math.random()-0.5)*0.012; this.vel[i3+2]=(Math.random()-0.5)*0.012;
+        this.life[i]=Math.random()*this.maxLife;
+      }
+      updateCoverColors(sampleFunc) {
+        this.hasCover = true; this.coverSampleFunc = sampleFunc;
+        for (let i=0; i<this.count; i++) {
+          const i3=i*3;
+          const nx = (this.pos[i3] / 10 + 1) / 2;
+          const ny = (this.pos[i3+1] / 10 + 1) / 2;
+          const color = sampleFunc(nx, ny);
+          this.col[i3] = color.r; this.col[i3+1] = color.g; this.col[i3+2] = color.b;
+        }
+        this.geo.attributes.color.needsUpdate = true;
+      }
+      clearCover() {
+        this.hasCover = false; this.coverSampleFunc = null;
+        for (let i=0; i<this.count; i++) {
+          const i3=i*3;
+          const c=new THREE.Color().setHSL(0.58+Math.random()*0.25,0.8,0.6);
+          this.col[i3]=c.r; this.col[i3+1]=c.g; this.col[i3+2]=c.b;
+        }
+        this.geo.attributes.color.needsUpdate = true;
+      }
+      update(dt,freq,beat,szMul=1){
+        if(!this.points||!freq) return;
+        const lo=this.avg(freq,0,10)/255, mi=this.avg(freq,20,80)/255, hi=this.avg(freq,100,200)/255;
+        for(let i=0;i<this.count;i++){
+          const i3=i*3; this.life[i]-=dt*0.28;
+          if(this.life[i]<=0){ this.reset(i); this.life[i]=this.maxLife; }
+          if(beat){ const d=Math.sqrt(this.pos[i3]**2+this.pos[i3+1]**2+this.pos[i3+2]**2); if(d<4.5){ this.vel[i3]+=this.pos[i3]/d*0.1; this.vel[i3+1]+=this.pos[i3+1]/d*0.1; this.vel[i3+2]+=this.pos[i3+2]/d*0.1; } }
+          const sp=1+lo*2.0; this.pos[i3]+=this.vel[i3]*sp*dt*18; this.pos[i3+1]+=this.vel[i3+1]*sp*dt*18; this.pos[i3+2]+=this.vel[i3+2]*sp*dt*18;
+          if(Math.abs(this.pos[i3])>16) this.vel[i3]*=-0.8; if(Math.abs(this.pos[i3+1])>16) this.vel[i3+1]*=-0.8; if(Math.abs(this.pos[i3+2])>16) this.vel[i3+2]*=-0.8;
+          if (!this.hasCover) {
+            const e=lo*0.6+mi*0.3+hi*0.1, color=new THREE.Color().setHSL(0.55+e*0.2,0.8,0.4+e*0.3);
+            this.col[i3]=color.r; this.col[i3+1]=color.g; this.col[i3+2]=color.b;
+          }
+          this.siz[i]=Math.max(0.06, (0.15+(this.hasCover?0.3:1.4))*szMul);
+        }
+        this.geo.attributes.position.needsUpdate=true;
+        this.geo.attributes.color.needsUpdate=true;
+        this.geo.attributes.size.needsUpdate=true;
+        for (let i=0; i<this.trails.length; i++) {
+          const t=this.trails[i];
+          const p=new THREE.Vector3(this.pos[i*3], this.pos[i*3+1], this.pos[i*3+2]);
+          t.hist.push(p); if(t.hist.length>4) t.hist.shift();
+          for (let j=0; j<t.hist.length; j++) { t.pos[j*3]=t.hist[j].x; t.pos[j*3+1]=t.hist[j].y; t.pos[j*3+2]=t.hist[j].z; }
+          t.line.geometry.attributes.position.needsUpdate=true; t.line.geometry.setDrawRange(0, t.hist.length);
+        }
+      }
+      avg(d,s,e){ if(!d) return 0; let sum=0; for(let i=s;i<=e;i++) sum+=d[i]; return sum/(e-s+1); }
+      setCount(n){ this.count=n; this.init(); }
+    }
+
+    class RadialSpectrum {
+      constructor(scene) {
+        this.scene=scene; this.bars=[]; this.barCount=512; this.maxRadius=8.5; this.visible=false;
+        this.smoothVals=new Float32Array(this.barCount);
+        this.geo=new THREE.BoxGeometry(0.16,1,0.16);
+        this.coverSampleFunc = null;
+        this.create();
+      }
+      create(){
+        this.bars.forEach(b=>{ this.scene.remove(b); b.material.dispose(); b.geometry.dispose(); });
+        this.bars=[];
+        const target=this.barCount;
+        let layers=Math.round(Math.sqrt(target*0.6)); if(layers<4) layers=4;
+        const radii=[], counts=[];
+        let est=0;
+        for(let l=0;l<layers;l++){ const r=(l+0.3)/layers*this.maxRadius; const c=2*Math.PI*r; let cnt=Math.max(4,Math.round(c/0.48)); radii.push(r); counts.push(cnt); est+=cnt; }
+        const factor=target/est;
+        for(let l=0;l<layers;l++) counts[l]=Math.max(3,Math.round(counts[l]*factor));
+        this.barCount=counts.reduce((a,b)=>a+b,0);
+        this.smoothVals=new Float32Array(this.barCount);
+        for(let l=0;l<layers;l++){
+          const r=radii[l], cnt=counts[l];
+          const freqRatio=1-(l/(layers-1));
+          for(let i=0;i<cnt;i++){
+            const angle=(i/cnt)*Math.PI*2;
+            const bar=new THREE.Mesh(this.geo, new THREE.MeshStandardMaterial({
+              color:0x4488ff, emissive:new THREE.Color(0x335577), roughness:0.3, metalness:0.2
+            }));
+            bar.position.set(Math.cos(angle)*r,0,Math.sin(angle)*r);
+            bar.userData.freqRatio=freqRatio;
+            bar.visible = this.visible;
+            this.scene.add(bar); this.bars.push(bar);
+          }
+        }
+        this.smoothVals.fill(0.1);
+      }
+      updateCoverColors(sampleFunc) {
+        this.coverSampleFunc = sampleFunc;
+        for (let i=0; i<this.bars.length; i++) {
+          const bar = this.bars[i];
+          const r = Math.sqrt(bar.position.x*bar.position.x + bar.position.z*bar.position.z);
+          const theta = Math.atan2(bar.position.z, bar.position.x);
+          const nx = (Math.cos(theta) * r / this.maxRadius + 1) / 2;
+          const ny = (Math.sin(theta) * r / this.maxRadius + 1) / 2;
+          const color = sampleFunc(nx, ny);
+          bar.material.color.setRGB(color.r, color.g, color.b);
+          bar.material.emissive.setRGB(color.r*0.3, color.g*0.3, color.b*0.3);
+        }
+      }
+      clearCover() {
+        this.coverSampleFunc = null;
+        for (let i=0; i<this.bars.length; i++) {
+          const bar = this.bars[i];
+          const ratio = bar.userData.freqRatio;
+          bar.material.color.setHSL(0.6+ratio*0.35,0.9,0.5+ratio*0.3);
+          bar.material.emissive.setHSL(0.6+ratio*0.35,0.8,0.2);
+        }
+      }
+      update(freq,gain,smooth){
+        if(!freq||this.bars.length===0) return;
+        if(this.smoothVals.length!==this.bars.length){ this.smoothVals=new Float32Array(this.bars.length); this.smoothVals.fill(0.1); }
+        const fLen=freq.length;
+        for(let i=0;i<this.bars.length;i++){
+          const bar=this.bars[i], ratio=bar.userData.freqRatio;
+          const center=Math.floor(ratio*(fLen-1)), range=Math.max(1,Math.floor(fLen*0.02));
+          let sum=0,c=0;
+          for(let j=Math.max(0,center-range);j<=Math.min(fLen-1,center+range);j++){ sum+=freq[j]; c++; }
+          const avg=sum/c/255, target=Math.max(0.05, avg*7.0*gain);
+          this.smoothVals[i]+=(target-this.smoothVals[i])*(1-smooth);
+          bar.scale.y=this.smoothVals[i]; bar.position.y=this.smoothVals[i]/2;
+          if (!this.coverSampleFunc) {
+            bar.material.color.setHSL(0.6+ratio*0.35,0.9,0.5+ratio*0.3);
+            bar.material.emissive.setHSL(0.6+ratio*0.35,0.8,0.2);
+          }
+        }
+      }
+      setVisible(v){ this.visible=v; this.bars.forEach(b=>b.visible=v); }
+      setCount(n){ this.barCount=n; this.create(); }
+    }
+
+    class ThreeDLyrics {
+      constructor(scene, camera) {
+        this.scene = scene;
+        this.camera = camera;
+        this.lyrics = [];
+        this.currentIndex = -1;
+        this.lyricColor = '#ffffff';
+        this.canvas = document.createElement('canvas');
+        this.canvas.width = 1024;
+        this.canvas.height = 256;
+        this.ctx = this.canvas.getContext('2d');
+        this.texture = new THREE.CanvasTexture(this.canvas);
+        this.material = new THREE.MeshBasicMaterial({ map: this.texture, transparent: true, side: THREE.DoubleSide, depthWrite: false });
+        this.geometry = new THREE.PlaneGeometry(12, 3);
+        this.mesh = new THREE.Mesh(this.geometry, this.material);
+        this.mesh.position.set(0, 6.5, 7);
+        this.mesh.visible = false;
+        this.scene.add(this.mesh);
+        this._updateTexture();
+      }
+      setLyrics(lyrics) {
+        this.lyrics = lyrics;
+        this.currentIndex = -1;
+        this._updateTexture();
+      }
+      setColor(color) {
+        this.lyricColor = color;
+        this._updateTexture();
+      }
+      update(time) {
+        if (this.lyrics.length === 0) return;
+        let newIndex = -1;
+        for (let i = 0; i < this.lyrics.length; i++) {
+          if (time >= this.lyrics[i].time) newIndex = i;
+          else break;
+        }
+        if (newIndex !== this.currentIndex) {
+          this.currentIndex = newIndex;
+          this._updateTexture();
+        }
+        this.mesh.lookAt(this.camera.position);
+      }
+      _updateTexture() {
+        const ctx = this.ctx;
+        ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        const color = this.lyricColor;
+        const currentLyric = this.currentIndex >= 0 ? this.lyrics[this.currentIndex].lyric : '';
+        const nextLyric = this.currentIndex + 1 < this.lyrics.length ? this.lyrics[this.currentIndex + 1].lyric : '';
+        ctx.fillStyle = color;
+        ctx.font = 'bold 72px "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(currentLyric || '♪ 暂无歌词 ♪', this.canvas.width / 2, this.canvas.height / 2 - 30);
+        if (nextLyric) {
+          ctx.font = '40px "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif';
+          ctx.globalAlpha = 0.5;
+          ctx.fillText(nextLyric, this.canvas.width / 2, this.canvas.height / 2 + 60);
+          ctx.globalAlpha = 1;
+        }
+        this.texture.needsUpdate = true;
+      }
+      setVisible(visible) {
+        this.mesh.visible = visible;
+      }
+      dispose() {
+        this.scene.remove(this.mesh);
+        this.geometry.dispose();
+        this.material.dispose();
+        this.texture.dispose();
+      }
+    }
+
+    class App {
+      constructor() {
+        this.audio = new AudioEngine();
+        this.playlist = new Playlist(this.audio, (song) => {
+          document.getElementById('trackTitle').textContent = song.name;
+          document.getElementById('trackArtist').textContent = '播放列表中';
+          document.getElementById('albumArt').textContent = '🎧';
+        });
+        this.playlist.coverCallback = (url) => this.handleCoverImage(url);
+        this.playlist.lyricCallback = (lyrics) => {
+          this.lyrics.setLyrics(lyrics);
+          this.log('歌词已应用');
+        };
+        this.playlist.lyricToggleEvent = () => {
+          this.lyricEnabled = true;
+          this.lyrics.setVisible(true);
+          document.getElementById('lyricToggle').checked = true;
+          this.log('歌词显示自动开启');
+        };
+        this.scene = new THREE.Scene();
+        this.camera = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 0.5, 60);
+        this.renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('three-canvas'), antialias:true });
+        this.composer = new EffectComposer(this.renderer);
+        this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+        this.particles = new ParticleSystem(this.scene);
+        this.spectrum = new RadialSpectrum(this.scene);
+        this.lyrics = new ThreeDLyrics(this.scene, this.camera);
+        this.mode = 'particle';
+        this.shakeAmount = 0;
+        this.clock = new THREE.Clock();
+        this.shakePass = null;
+        this.isDragging = false;
+        this.perfMode = false;
+        this.debugEnabled = false;
+        this.lyricEnabled = false;
+        this.debugPanel = document.getElementById('debugPanel');
+        this.debugLog = [];
+        this.debugUpdateInterval = null;
+        this.fps = 0; this.cpuLoad = 0; this.frameTimes = [];
+        this.lastFrameTime = performance.now(); this.lastPerfUpdate = performance.now();
+        this.perfMonitorEl = document.getElementById('perfMonitor');
+        this.isDraggingMonitor = false; this.monitorDragOffset = { x: 0, y: 0 };
+        // 黑胶模型相关
+        this.vinylGroup = null;
+        this.vinylCoverMesh = null;
+        this.vinylDiscMesh = null;
+        this.vinylGrooveMesh = null;
+        this.vinylParticles = null;
+        this.initVinylModel();
+        this.init();
+      }
+      log(message) {
+        this.debugLog.push(new Date().toLocaleTimeString() + ' - ' + message);
+        if (this.debugLog.length > 50) this.debugLog.shift();
+        const logContent = document.getElementById('debugLogContent');
+        if (logContent && logContent.classList.contains('open')) {
+          logContent.textContent = this.debugLog.slice(-20).join('\n');
+        }
+        if (this.debugEnabled) this.updateDebugPanel();
+      }
+      initVinylModel() {
+        this.vinylGroup = new THREE.Group();
+        
+        const discGeometry = new THREE.CylinderGeometry(5, 5, 0.2, 64);
+        const discMaterial = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.25, metalness: 0.7 });
+        this.vinylDiscMesh = new THREE.Mesh(discGeometry, discMaterial);
+        this.vinylDiscMesh.position.y = 0.1;
+        this.vinylGroup.add(this.vinylDiscMesh);
+        
+        const grooveCanvas = document.createElement('canvas');
+        grooveCanvas.width = 512;
+        grooveCanvas.height = 512;
+        const gCtx = grooveCanvas.getContext('2d');
+        gCtx.fillStyle = '#000';
+        gCtx.fillRect(0, 0, 512, 512);
+        gCtx.strokeStyle = '#444';
+        gCtx.lineWidth = 2;
+        for (let r = 20; r < 250; r += 6) {
+          gCtx.beginPath();
+          gCtx.arc(256, 256, r, 0, Math.PI * 2);
+          gCtx.stroke();
+        }
+        const grooveTexture = new THREE.CanvasTexture(grooveCanvas);
+        const grooveGeometry = new THREE.RingGeometry(4.6, 5.0, 64);
+        const pos = grooveGeometry.attributes.position;
+        const uv = grooveGeometry.attributes.uv;
+        for (let i = 0; i < pos.count; i++) {
+          const x = pos.getX(i);
+          const y = pos.getY(i);
+          const radius = Math.sqrt(x*x + y*y);
+          const angle = Math.atan2(y, x);
+          const u = (angle / (Math.PI * 2) + 0.5) % 1;
+          const v = (radius - 4.6) / 0.4;
+          uv.setXY(i, u, v);
+        }
+        const grooveMaterial = new THREE.MeshBasicMaterial({ map: grooveTexture, side: THREE.DoubleSide, transparent: true, opacity: 0.7 });
+        this.vinylGrooveMesh = new THREE.Mesh(grooveGeometry, grooveMaterial);
+        this.vinylGrooveMesh.rotation.x = Math.PI / 2;
+        this.vinylGrooveMesh.position.y = 0.11;
+        this.vinylGroup.add(this.vinylGrooveMesh);
+        
+        const coverGeometry = new THREE.CircleGeometry(3.5, 64);
+        const coverMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+        this.vinylCoverMesh = new THREE.Mesh(coverGeometry, coverMaterial);
+        this.vinylCoverMesh.rotation.x = Math.PI / 2;
+        this.vinylCoverMesh.position.y = 0.21;
+        this.vinylGroup.add(this.vinylCoverMesh);
+        
+        const holeGeometry = new THREE.CircleGeometry(0.2, 32);
+        const holeMaterial = new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide });
+        const holeMesh = new THREE.Mesh(holeGeometry, holeMaterial);
+        holeMesh.rotation.x = Math.PI / 2;
+        holeMesh.position.y = 0.22;
+        this.vinylGroup.add(holeMesh);
+        
+        const particleCount = 400;
+        const particleGeo = new THREE.BufferGeometry();
+        const particlePositions = new Float32Array(particleCount * 3);
+        for (let i = 0; i < particleCount; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const radius = 3.8 + Math.random() * 1.2;
+          const x = Math.cos(angle) * radius;
+          const z = Math.sin(angle) * radius;
+          const y = 0.15 + Math.random() * 0.1;
+          particlePositions[i*3] = x;
+          particlePositions[i*3+1] = y;
+          particlePositions[i*3+2] = z;
+        }
+        particleGeo.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
+        const particleMat = new THREE.PointsMaterial({
+          color: 0xccccff,
+          size: 0.03,
+          transparent: true,
+          opacity: 0.6,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false
+        });
+        this.vinylParticles = new THREE.Points(particleGeo, particleMat);
+        this.vinylGroup.add(this.vinylParticles);
+        
+        this.vinylGroup.visible = false;
+        this.scene.add(this.vinylGroup);
+      }
+      updateVinylCoverTexture(url) {
+        if (!url) {
+          this.vinylCoverMesh.material.map = null;
+          this.vinylCoverMesh.material.color.set(0xffffff);
+          this.vinylCoverMesh.material.needsUpdate = true;
+          return;
+        }
+        const img = new Image();
+        img.onload = () => {
+          const texture = new THREE.Texture(img);
+          // 修复镜像：水平翻转
+          texture.wrapS = THREE.RepeatWrapping;
+          texture.repeat.x = -1;
+          texture.offset.x = 1;
+          texture.needsUpdate = true;
+          this.vinylCoverMesh.material.map = texture;
+          this.vinylCoverMesh.material.color.set(0xffffff);
+          this.vinylCoverMesh.material.needsUpdate = true;
+        };
+        img.src = url;
+      }
+      init() {
+        this.scene.background = new THREE.Color(0x181828);
+        this.scene.fog = new THREE.FogExp2(0x181828, 0.0001);
+        this.camera.position.set(0, 2.5, 15);
+        this.renderer.setSize(innerWidth, innerHeight);
+        this.renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+        this.renderer.toneMapping = THREE.ReinhardToneMapping;
+        this.renderer.toneMappingExposure = 1.2;
+        this.scene.add(new THREE.AmbientLight(0x8899bb));
+        const dl = new THREE.DirectionalLight(0xffffff, 1.2); dl.position.set(1,1,1); this.scene.add(dl);
+        const dl2 = new THREE.DirectionalLight(0xccddff, 1.0); dl2.position.set(-1,-0.5,-0.5); this.scene.add(dl2);
+        const starsGeo = new THREE.BufferGeometry(); const sp = new Float32Array(2500*3);
+        for (let i=0;i<2500*3;i+=3){ sp[i]=(Math.random()-0.5)*55; sp[i+1]=(Math.random()-0.5)*35; sp[i+2]=(Math.random()-0.5)*45; }
+        starsGeo.setAttribute('position',new THREE.BufferAttribute(sp,3));
+        this.scene.add(new THREE.Points(starsGeo, new THREE.PointsMaterial({color:0xaabbcc, size:0.15, blending:THREE.AdditiveBlending})));
+        const renderPass = new RenderPass(this.scene, this.camera);
+        const bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight), 0.9, 0.4, 0.85);
+        bloomPass.strength = 0.6;
+        this.bloomPass = bloomPass;
+        this.shakePass = new ShaderPass(ShakeShader);
+        this.composer.addPass(renderPass);
+        this.composer.addPass(bloomPass);
+        this.composer.addPass(this.shakePass);
+        this.shakePass.renderToScreen = true;
+        this.controls.target.set(0,0.5,0);
+        this.controls.enableDamping=true; this.controls.dampingFactor=0.1;
+        this.controls.autoRotate=true; this.controls.autoRotateSpeed=0.6;
+        this.controls.minDistance=5; this.controls.maxDistance=30;
+        this.controls.maxPolarAngle=Math.PI*0.65;
+        this.controls.update();
+        this.applyModeVisibility();
+        this.audio.beatCallback = (e) => { this.shakeAmount = Math.min(e*2.0, 1.0); this.log('检测到鼓点'); };
+        this.bindEvents();
+        this.animate();
+        this.log('应用初始化完成');
+      }
+      applyModeVisibility() {
+        const showGlobalParticles = this.mode === 'particle' || this.mode === 'both';
+        const showSpectrum = this.mode === 'spectrum' || this.mode === 'both';
+        this.particles.visible = showGlobalParticles;
+        if (this.particles.points) this.particles.points.visible = showGlobalParticles;
+        this.spectrum.setVisible(showSpectrum);
+        this.vinylGroup.visible = (this.mode === 'vinyl');
+        if (this.mode === 'vinyl') {
+          this.controls.autoRotate = false;
+        } else {
+          this.controls.autoRotate = document.getElementById('autoRotateToggle')?.checked ?? true;
+        }
+      }
+      setMode(newMode) {
+        this.mode = newMode;
+        this.applyModeVisibility();
+        if (this.mode === 'vinyl') {
+          this.camera.position.set(0, 14, 0.01);
+          this.controls.target.set(0, 0, 0);
+        } else {
+          if (this.mode === 'spectrum' || this.mode === 'both') {
+            this.camera.position.set(0, 12, 0.1);
+            this.controls.target.set(0, 0, 0);
+          } else {
+            this.camera.position.set(0, 2.5, 15);
+            this.controls.target.set(0, 0.5, 0);
+          }
+        }
+        this.controls.update();
+        this.log('切换到模式: ' + this.mode);
+      }
+      updateSliderLimits(perfMode) {
+        const ids = ['particleCount','particleSize','barCount','spectrumGain','shakeIntensity'];
+        const keys = ['particleCount','particleSize','barCount','spectrumGain','shakeIntensity'];
+        ids.forEach((id, i) => {
+          const slider = document.getElementById(id);
+          if (!slider) return;
+          const key = keys[i];
+          const limits = PERF_LIMITS[key];
+          const newMax = perfMode ? limits.perfMax : limits.defaultMax;
+          slider.max = newMax;
+          if (parseFloat(slider.value) > newMax) slider.value = newMax;
+        });
+        this.log('性能模式: ' + (perfMode ? '开启' : '关闭'));
+      }
+      updatePerformanceMonitor(now) {
+        const frameDelta = now - this.lastFrameTime;
+        this.lastFrameTime = now;
+        if (frameDelta > 0) { this.frameTimes.push(frameDelta); if (this.frameTimes.length > 60) this.frameTimes.shift(); }
+        if (now - this.lastPerfUpdate >= 1000) {
+          const frameCount = this.frameTimes.length;
+          const totalTime = this.frameTimes.reduce((a,b)=>a+b,0);
+          this.fps = frameCount > 0 ? Math.round(frameCount / (totalTime / 1000)) : 0;
+          const avgFrameTime = totalTime / frameCount;
+          this.cpuLoad = Math.min(1, Math.max(0, (avgFrameTime - 16.67) / 16.67));
+          let memText = 'N/A';
+          if (performance.memory) {
+            const used = Math.round(performance.memory.usedJSHeapSize / 1048576);
+            const limit = Math.round(performance.memory.jsHeapSizeLimit / 1048576);
+            memText = `${used} / ${limit} MB`;
+          }
+          let cpuText = this.cpuLoad < 0.05 ? '<5%' : Math.round(this.cpuLoad * 100) + '%';
+          if (this.perfMonitorEl) {
+            this.perfMonitorEl.innerHTML = `<span>FPS: ${this.fps}</span><span>CPU: ${cpuText}</span><span>MEM: ${memText}</span>`;
+          }
+          this.lastPerfUpdate = now; this.frameTimes = [];
+        }
+      }
+      updateDebugPanel() {
+        if (!this.debugPanel) return;
+        if (!this.debugBase) {
+          this.debugBase = document.createElement('div');
+          this.debugBase.id = 'debugBase';
+          const btn = document.createElement('button');
+          btn.className = 'debug-log-btn';
+          btn.textContent = '详细日志';
+          btn.addEventListener('click', () => {
+            const content = document.getElementById('debugLogContent');
+            content.classList.toggle('open');
+            if (content.classList.contains('open')) {
+              content.textContent = this.debugLog.slice(-20).join('\n');
+            }
+          });
+          const logContent = document.createElement('div');
+          logContent.id = 'debugLogContent';
+          logContent.className = 'debug-log-content';
+          this.debugPanel.appendChild(this.debugBase);
+          this.debugPanel.appendChild(btn);
+          this.debugPanel.appendChild(logContent);
+        }
+        this.debugBase.textContent = 
+          '=== 基本信息 ===\n' +
+          '播放状态: ' + (this.audio.isPlaying ? '播放中' : '暂停') + '\n' +
+          '当前模式: ' + this.mode + '\n' +
+          '粒子数量: ' + this.particles.count + '\n' +
+          '频谱柱数: ' + this.spectrum.barCount + '\n' +
+          '歌词显示: ' + (this.lyricEnabled ? '开' : '关') + '\n' +
+          '歌词数量: ' + (this.lyrics.lyrics.length > 0 ? this.lyrics.lyrics.length + ' 条' : '无') + '\n' +
+          'FPS: ' + this.fps + '\n' +
+          'CPU: ' + Math.round(this.cpuLoad * 100) + '%\n' +
+          '声伴比例: ' + (document.getElementById('vocalMix')?.value ?? 'N/A') + '\n' +
+          '左右平衡: ' + (document.getElementById('balanceSlider')?.value ?? 'N/A') + '\n' +
+          '音调: ' + (document.getElementById('pitchSlider')?.value ?? 'N/A');
+        this.debugBase.textContent += '\n\n=== 最近日志 ===\n' + this.debugLog.slice(-5).join('\n');
+        const logContent = document.getElementById('debugLogContent');
+        if (logContent.classList.contains('open')) {
+          logContent.textContent = this.debugLog.slice(-20).join('\n');
+        }
+      }
+      handleCoverImage(url) {
+        if (!url) { this.spectrum.clearCover(); this.particles.clearCover(); this.updateVinylCoverTexture(null); this.log('清除封面'); return; }
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const size = 128;
+          canvas.width = size; canvas.height = size;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, size, size);
+          const imageData = ctx.getImageData(0, 0, size, size);
+          const data = imageData.data;
+          const sample = (nx, ny) => {
+            const x = Math.min(size-1, Math.max(0, nx * (size-1)));
+            const y = Math.min(size-1, Math.max(0, ny * (size-1)));
+            const x0 = Math.floor(x), y0 = Math.floor(y);
+            const x1 = Math.min(size-1, x0+1), y1 = Math.min(size-1, y0+1);
+            const dx = x - x0, dy = y - y0;
+            const i00 = (y0*size + x0)*4, i10 = (y0*size + x1)*4, i01 = (y1*size + x0)*4, i11 = (y1*size + x1)*4;
+            const r = (data[i00]*(1-dx)*(1-dy) + data[i10]*dx*(1-dy) + data[i01]*(1-dx)*dy + data[i11]*dx*dy);
+            const g = (data[i00+1]*(1-dx)*(1-dy) + data[i10+1]*dx*(1-dy) + data[i01+1]*(1-dx)*dy + data[i11+1]*dx*dy);
+            const b = (data[i00+2]*(1-dx)*(1-dy) + data[i10+2]*dx*(1-dy) + data[i01+2]*(1-dx)*dy + data[i11+2]*dx*dy);
+            return { r: r/255, g: g/255, b: b/255 };
+          };
+          this.spectrum.updateCoverColors(sample);
+          this.particles.updateCoverColors(sample);
+          this.updateVinylCoverTexture(url);
+          this.log('封面已加载');
+          if (this.mode === 'spectrum' || this.mode === 'both') {
+            this.camera.position.set(0, 12, 0.1);
+            this.controls.target.set(0, 0, 0);
+            this.controls.update();
+          }
+        };
+        img.onerror = () => showToast('封面加载失败');
+        img.src = url;
+      }
+      bindEvents() {
+        window.addEventListener('resize', ()=>{ this.camera.aspect=innerWidth/innerHeight; this.camera.updateProjectionMatrix(); this.renderer.setSize(innerWidth,innerHeight); this.composer.setSize(innerWidth,innerHeight); });
+        document.getElementById('btnPlay').onclick = () => {
+          if (this.playlist.currentIndex === -1) {
+            showToast('请先导入歌曲');
+            return;
+          }
+          if (this.playlist.loadedIndex !== this.playlist.currentIndex) {
+            this.playlist.playSong(this.playlist.currentIndex);
+          } else {
+            if (this.audio.isPlaying) {
+              this.audio.pause();
+              this.log('暂停');
+            } else {
+              this.audio.play();
+              this.log('播放');
+            }
+          }
+        };
+        const vocalMix = document.getElementById('vocalMix');
+        vocalMix.addEventListener('input', (e) => { this.audio.setVocalMix(parseFloat(e.target.value)); this.log('声伴比例: ' + e.target.value); });
+        const balanceSlider = document.getElementById('balanceSlider');
+        balanceSlider.addEventListener('input', (e) => { this.audio.setBalance(parseFloat(e.target.value)); this.log('左右平衡: ' + e.target.value); });
+        const pitchSlider = document.getElementById('pitchSlider');
+        pitchSlider.addEventListener('input', (e) => { this.audio.setPitch(parseFloat(e.target.value)); this.log('音调: ' + e.target.value); });
+        const resetBtn = document.getElementById('resetAudioBtn');
+        resetBtn.addEventListener('click', () => {
+          vocalMix.value = 0; this.audio.setVocalMix(0);
+          balanceSlider.value = 0; this.audio.setBalance(0);
+          pitchSlider.value = 1.0; this.audio.setPitch(1.0);
+          this.log('音频参数复位');
+        });
+        const glassOpacitySlider = document.getElementById('glassOpacity');
+        glassOpacitySlider.addEventListener('input', (e) => { document.documentElement.style.setProperty('--glass-opacity', parseFloat(e.target.value)); this.log('玻璃透明度: ' + e.target.value); });
+        const lyricColorInput = document.getElementById('lyricColor');
+        lyricColorInput.addEventListener('input', (e) => { this.lyrics.setColor(e.target.value); this.log('歌词颜色: ' + e.target.value); });
+        const lyricToggle = document.getElementById('lyricToggle');
+        lyricToggle.addEventListener('change', (e) => {
+          this.lyricEnabled = e.target.checked;
+          this.lyrics.setVisible(this.lyricEnabled);
+          if (this.lyricEnabled && this.lyrics.lyrics.length === 0) {
+            this.lyrics.setLyrics([]);
+          }
+          this.log('歌词显示: ' + (this.lyricEnabled ? '开' : '关'));
+        });
+        document.getElementById('debugToggle').addEventListener('change', (e) => {
+          this.debugEnabled = e.target.checked;
+          if (this.debugEnabled) {
+            this.debugPanel.style.display = 'block';
+            this.updateDebugPanel();
+            if (this.debugUpdateInterval) clearInterval(this.debugUpdateInterval);
+            this.debugUpdateInterval = setInterval(() => this.updateDebugPanel(), 1000);
+            this.log('Debug模式开启');
+          } else {
+            this.debugPanel.style.display = 'none';
+            if (this.debugUpdateInterval) { clearInterval(this.debugUpdateInterval); this.debugUpdateInterval = null; }
+          }
+        });
+        const progressBg = document.getElementById('progressBarBg');
+        const progressFill = document.getElementById('progressFill');
+        const currentLabel = document.getElementById('currentTimeLabel');
+        const timeDisplay = document.getElementById('timeDisplay');
+        const seek = (clientX) => {
+          if (!this.audio.duration) return;
+          const rect = progressBg.getBoundingClientRect();
+          const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+          const newTime = ratio * this.audio.duration;
+          this.audio.setTime(newTime);
+          progressFill.style.width = `${ratio*100}%`;
+          const formatted = this.audio.fmt(newTime);
+          currentLabel.textContent = formatted;
+          timeDisplay.textContent = `${formatted} / ${this.audio.fmt(this.audio.duration)}`;
+          this.log('进度跳转至 ' + formatted);
+        };
+        progressBg.addEventListener('mousedown', (e) => { e.preventDefault(); this.isDragging = true; seek(e.clientX); });
+        window.addEventListener('mousemove', (e) => { if (this.isDragging) seek(e.clientX); });
+        window.addEventListener('mouseup', () => { this.isDragging = false; });
+        progressBg.addEventListener('touchstart', (e) => { e.preventDefault(); this.isDragging = true; seek(e.touches[0].clientX); });
+        window.addEventListener('touchmove', (e) => { if (this.isDragging) seek(e.touches[0].clientX); });
+        window.addEventListener('touchend', () => { this.isDragging = false; });
+        document.querySelectorAll('.mode-btn').forEach(btn => {
+          btn.onclick = () => {
+            document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+            btn.classList.add('active');
+            const newMode = btn.dataset.mode;
+            this.setMode(newMode);
+          };
+        });
+        document.getElementById('btnSettings').onclick = ()=> { document.getElementById('settingsPanel').classList.add('open'); this.log('打开设置'); };
+        document.getElementById('btnCloseSettings').onclick = ()=> { document.getElementById('settingsPanel').classList.remove('open'); this.log('关闭设置'); };
+        const fileInput = document.getElementById('fileInput');
+        document.getElementById('btnLoadFile').onclick = () => { fileInput.value = ''; fileInput.click(); this.log('打开文件选择'); };
+        fileInput.addEventListener('change', () => {
+          if (fileInput.files.length) {
+            this.playlist.addFiles(Array.from(fileInput.files));
+            this.log('导入文件: ' + fileInput.files.length + ' 个');
+          }
+        });
+        document.getElementById('songCard').onclick = () => { this.playlist.togglePanel(); this.log('切换歌曲卡片'); };
+        document.getElementById('playlistFab').onclick = () => { this.playlist.togglePanel(); this.log('切换歌单面板'); };
+        document.getElementById('playlistOverlay').onclick = () => { this.playlist.togglePanel(); this.log('点击遮罩关闭歌单'); };
+        document.getElementById('btnPrev').onclick = () => { this.playlist.prev(); this.log('上一曲'); };
+        document.getElementById('btnNext').onclick = () => { this.playlist.next(); this.log('下一曲'); };
+        document.getElementById('particleCount').oninput = e => { this.particles.setCount(+e.target.value); this.applyModeVisibility(); this.log('粒子数量: ' + e.target.value); };
+        document.getElementById('barCount').oninput = e => { this.spectrum.setCount(+e.target.value); this.applyModeVisibility(); this.log('频谱柱数: ' + e.target.value); };
+        document.getElementById('bloomToggle').onchange = e => { this.bloomPass.enabled = e.target.checked; this.log('辉光: ' + (e.target.checked ? '开' : '关')); };
+        document.getElementById('autoRotateToggle').onchange = e => { 
+          this.controls.autoRotate = e.target.checked && this.mode !== 'vinyl';
+          this.log('自动旋转: ' + (e.target.checked ? '开' : '关')); 
+        };
+        const perfToggle = document.getElementById('perfModeToggle');
+        perfToggle.addEventListener('change', () => {
+          if (perfToggle.checked) {
+            const confirmed = confirm('⚠️ 性能模式警告 ⚠️\n\n您即将开启性能模式，以下参数上限将被大幅突破：\n\n• 频谱柱数：1,000 → 10,000 根\n• 粒子数量：20,000 → 50,000 个\n• 频谱灵敏度：8 → 20\n• 粒子大小上限：2 → 5\n• 震动强度上限：2 → 5\n\n这会显著增加GPU/CPU负载，仅建议在高端设备上使用。\n\n确定要继续吗？');
+            if (confirmed) { this.perfMode = true; this.updateSliderLimits(true); this.perfMonitorEl?.classList.add('perf-large'); this.log('性能模式开启'); }
+            else { perfToggle.checked = false; }
+          } else { this.perfMode = false; this.updateSliderLimits(false); this.perfMonitorEl?.classList.remove('perf-large'); this.log('性能模式关闭'); }
+        });
+        document.getElementById('styleSwitchBtn').addEventListener('click', () => {
+          window.open('https://www.example.com', '_blank');
+          this.log('跳转网页');
+        });
+        if (this.perfMonitorEl) {
+          const onDragStart = (e) => {
+            this.isDraggingMonitor = true;
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            const rect = this.perfMonitorEl.getBoundingClientRect();
+            this.monitorDragOffset.x = clientX - rect.left;
+            this.monitorDragOffset.y = clientY - rect.top;
+            e.preventDefault();
+          };
+          const onDragMove = (e) => {
+            if (!this.isDraggingMonitor) return;
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            let newLeft = clientX - this.monitorDragOffset.x;
+            let newTop = clientY - this.monitorDragOffset.y;
+            this.perfMonitorEl.style.left = newLeft + 'px';
+            this.perfMonitorEl.style.bottom = (window.innerHeight - newTop - this.perfMonitorEl.offsetHeight) + 'px';
+            e.preventDefault();
+          };
+          const onDragEnd = () => { this.isDraggingMonitor = false; };
+          this.perfMonitorEl.addEventListener('mousedown', onDragStart);
+          window.addEventListener('mousemove', onDragMove);
+          window.addEventListener('mouseup', onDragEnd);
+          this.perfMonitorEl.addEventListener('touchstart', onDragStart, { passive: false });
+          window.addEventListener('touchmove', onDragMove, { passive: false });
+          window.addEventListener('touchend', onDragEnd);
+        }
+        window.addEventListener('keydown', e => { if(e.code==='Space'){ e.preventDefault(); this.audio.unlock(); if(this.audio.isPlaying) this.audio.pause(); else this.audio.play(); } });
+      }
+      animate() {
+        requestAnimationFrame(()=>this.animate());
+        const now = performance.now();
+        this.updatePerformanceMonitor(now);
+        const dt = Math.min(0.1, this.clock.getDelta());
+        this.audio.updateFreq(); this.audio.updateTime();
+        const beat = this.audio.detectBeat();
+        if (this.audio.isPlaying && !this.isDragging) {
+          const p = this.audio.getProgress();
+          document.getElementById('progressFill').style.width = `${p*100}%`;
+          const current = this.audio.fmt(this.audio.getTime());
+          document.getElementById('currentTimeLabel').textContent = current;
+          document.getElementById('timeDisplay').textContent = `${current} / ${this.audio.fmt(this.audio.duration)}`;
+          if (this.lyricEnabled) this.lyrics.update(this.audio.getTime());
+        }
+        const shakeOn = document.getElementById('shakeToggle')?.checked ?? true;
+        const intensity = +document.getElementById('shakeIntensity')?.value || 0.8;
+        if (beat && shakeOn) this.shakeAmount = intensity * 0.8;
+        this.shakeAmount *= 0.88;
+        if (this.shakePass) {
+          this.shakePass.uniforms.uShakeX.value = (Math.random()-0.5)*this.shakeAmount*0.02;
+          this.shakePass.uniforms.uShakeY.value = (Math.random()-0.5)*this.shakeAmount*0.02;
+        }
+        this.controls.update();
+        if (this.mode === 'vinyl') {
+          if (this.vinylGroup) {
+            this.vinylGroup.rotation.y += dt * 0.3;
+          }
+        } else {
+          const szMul = +document.getElementById('particleSize')?.value || 0.7;
+          if (this.mode !== 'spectrum') this.particles.update(dt, this.audio.freqData, beat, szMul);
+          if (this.mode !== 'particle' && this.mode !== 'vinyl') {
+            const gain = +document.getElementById('spectrumGain')?.value || 4.0;
+            const smooth = +document.getElementById('spectrumSmooth')?.value || 0.55;
+            this.spectrum.update(this.audio.freqData, gain, smooth);
+          }
+        }
+        this.bloomPass.strength = document.getElementById('bloomToggle')?.checked ? 0.6 : 0.0;
+        this.composer.render();
+        if (this.audio.duration) document.getElementById('durationLabel').textContent = this.audio.fmt(this.audio.duration);
+      }
+    }
+    new App();
+  </script>
+</body>
+</html>
