@@ -14,13 +14,6 @@
     }
   </script>
   <style>
-/* 
-  _____ _   _ _  _ ___  __   _____ ____  __  __   _   __  __
- |_   _| | | | \| | __| \ \ / /_ _|_  / |  \/  | /_\  \ \/ /
-   | | | |_| | .` | _|   \ V / | | / /  | |\/| |/ _ \  >  < 
-   |_|  \___/|_|\_|___|   \_/ |___/___| |_|  |_/_/ \_\/_/\_\
-Produced by Xiren, TUNE‑Viz Series
-*/
     :root {
       --glass-opacity: 0.45;
       --glass-bg: rgba(20, 20, 35, var(--glass-opacity));
@@ -981,12 +974,13 @@ Produced by Xiren, TUNE‑Viz Series
         this.lastFrameTime = performance.now(); this.lastPerfUpdate = performance.now();
         this.perfMonitorEl = document.getElementById('perfMonitor');
         this.isDraggingMonitor = false; this.monitorDragOffset = { x: 0, y: 0 };
-        // 黑胶模型相关
         this.vinylGroup = null;
-        this.vinylCoverMesh = null;
-        this.vinylDiscMesh = null;
-        this.vinylGrooveMesh = null;
         this.vinylParticles = null;
+        this.vinylParticleRadii = null;
+        this.vinylParticleAngles = null;
+        this.vinylParticleTypes = null;
+        this.vinylParticleCount = 0;
+        this.vinylCoverRadius = 3.3;
         this.initVinylModel();
         this.init();
       }
@@ -1001,107 +995,175 @@ Produced by Xiren, TUNE‑Viz Series
       }
       initVinylModel() {
         this.vinylGroup = new THREE.Group();
-        
-        const discGeometry = new THREE.CylinderGeometry(5, 5, 0.2, 64);
-        const discMaterial = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.25, metalness: 0.7 });
-        this.vinylDiscMesh = new THREE.Mesh(discGeometry, discMaterial);
-        this.vinylDiscMesh.position.y = 0.1;
-        this.vinylGroup.add(this.vinylDiscMesh);
-        
-        const grooveCanvas = document.createElement('canvas');
-        grooveCanvas.width = 512;
-        grooveCanvas.height = 512;
-        const gCtx = grooveCanvas.getContext('2d');
-        gCtx.fillStyle = '#000';
-        gCtx.fillRect(0, 0, 512, 512);
-        gCtx.strokeStyle = '#444';
-        gCtx.lineWidth = 2;
-        for (let r = 20; r < 250; r += 6) {
-          gCtx.beginPath();
-          gCtx.arc(256, 256, r, 0, Math.PI * 2);
-          gCtx.stroke();
+
+        const HOLE_R = 0.15;
+        const COVER_R = 3.3;
+        const TRANSITION_END = 3.5;
+        const GROOVE_START = 3.5;
+        const GROOVE_END = 4.95;
+        const EDGE_END = 5.0;
+
+        // 收集所有粒子的属性
+        const posList = [];
+        const colList = [];
+        const sizeList = [];
+        const typeList = []; // 0=cover, 1=groove, 2=edge, 3=transition
+
+        // === 1. 封面区：面积均匀分布 ===
+        const COVER_COUNT = 120000;
+        for (let i = 0; i < COVER_COUNT; i++) {
+          const r = Math.sqrt(Math.random() * (COVER_R * COVER_R - HOLE_R * HOLE_R) + HOLE_R * HOLE_R);
+          const a = Math.random() * Math.PI * 2;
+          const x = Math.cos(a) * r;
+          const z = Math.sin(a) * r;
+          posList.push(x, 0, z);
+          colList.push(0.9, 0.9, 0.9);
+          sizeList.push(0.06);
+          typeList.push(0);
         }
-        const grooveTexture = new THREE.CanvasTexture(grooveCanvas);
-        const grooveGeometry = new THREE.RingGeometry(4.6, 5.0, 64);
-        const pos = grooveGeometry.attributes.position;
-        const uv = grooveGeometry.attributes.uv;
-        for (let i = 0; i < pos.count; i++) {
-          const x = pos.getX(i);
-          const y = pos.getY(i);
-          const radius = Math.sqrt(x*x + y*y);
-          const angle = Math.atan2(y, x);
-          const u = (angle / (Math.PI * 2) + 0.5) % 1;
-          const v = (radius - 4.6) / 0.4;
-          uv.setXY(i, u, v);
+
+        // === 2. 过渡带 ===
+        const TRANS_COUNT = 4000;
+        for (let i = 0; i < TRANS_COUNT; i++) {
+          const r = COVER_R + Math.random() * (TRANSITION_END - COVER_R);
+          const a = Math.random() * Math.PI * 2;
+          const x = Math.cos(a) * r;
+          const z = Math.sin(a) * r;
+          posList.push(x, 0, z);
+          colList.push(0.06, 0.06, 0.08);
+          sizeList.push(0.04);
+          typeList.push(3);
         }
-        const grooveMaterial = new THREE.MeshBasicMaterial({ map: grooveTexture, side: THREE.DoubleSide, transparent: true, opacity: 0.7 });
-        this.vinylGrooveMesh = new THREE.Mesh(grooveGeometry, grooveMaterial);
-        this.vinylGrooveMesh.rotation.x = Math.PI / 2;
-        this.vinylGrooveMesh.position.y = 0.11;
-        this.vinylGroup.add(this.vinylGrooveMesh);
-        
-        const coverGeometry = new THREE.CircleGeometry(3.5, 64);
-        const coverMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
-        this.vinylCoverMesh = new THREE.Mesh(coverGeometry, coverMaterial);
-        this.vinylCoverMesh.rotation.x = Math.PI / 2;
-        this.vinylCoverMesh.position.y = 0.21;
-        this.vinylGroup.add(this.vinylCoverMesh);
-        
-        const holeGeometry = new THREE.CircleGeometry(0.2, 32);
-        const holeMaterial = new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide });
-        const holeMesh = new THREE.Mesh(holeGeometry, holeMaterial);
-        holeMesh.rotation.x = Math.PI / 2;
-        holeMesh.position.y = 0.22;
-        this.vinylGroup.add(holeMesh);
-        
-        const particleCount = 400;
-        const particleGeo = new THREE.BufferGeometry();
-        const particlePositions = new Float32Array(particleCount * 3);
-        for (let i = 0; i < particleCount; i++) {
-          const angle = Math.random() * Math.PI * 2;
-          const radius = 3.8 + Math.random() * 1.2;
-          const x = Math.cos(angle) * radius;
-          const z = Math.sin(angle) * radius;
-          const y = 0.15 + Math.random() * 0.1;
-          particlePositions[i*3] = x;
-          particlePositions[i*3+1] = y;
-          particlePositions[i*3+2] = z;
+
+        // === 3. 沟槽区：同心圆排列，亮度交替形成刻痕感 ===
+        const GROOVE_CIRCLES = 100;
+        const PARTICLES_PER_GROOVE = 800;
+        for (let g = 0; g < GROOVE_CIRCLES; g++) {
+          const baseR = GROOVE_START + (g / (GROOVE_CIRCLES - 1)) * (GROOVE_END - GROOVE_START);
+          const isBright = (g % 2 === 0);
+          const baseColor = isBright ? 0.16 : 0.07;
+          const angleStep = (Math.PI * 2) / PARTICLES_PER_GROOVE;
+          for (let i = 0; i < PARTICLES_PER_GROOVE; i++) {
+            const jitterR = (Math.random() - 0.5) * 0.006;
+            const jitterA = (Math.random() - 0.5) * angleStep * 0.7;
+            const r = baseR + jitterR;
+            const a = i * angleStep + jitterA;
+            const x = Math.cos(a) * r;
+            const z = Math.sin(a) * r;
+            posList.push(x, 0, z);
+            const jitterC = baseColor + Math.random() * 0.02;
+            colList.push(jitterC * 0.85, jitterC * 0.85, jitterC);
+            sizeList.push(0.035);
+            typeList.push(1);
+          }
         }
-        particleGeo.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
-        const particleMat = new THREE.PointsMaterial({
-          color: 0xccccff,
-          size: 0.03,
+
+        // === 4. 边缘：略亮的勾勒线 ===
+        const EDGE_COUNT = 2500;
+        for (let i = 0; i < EDGE_COUNT; i++) {
+          const r = GROOVE_END + Math.random() * (EDGE_END - GROOVE_END);
+          const a = Math.random() * Math.PI * 2;
+          const x = Math.cos(a) * r;
+          const z = Math.sin(a) * r;
+          posList.push(x, 0, z);
+          colList.push(0.28, 0.28, 0.35);
+          sizeList.push(0.06);
+          typeList.push(2);
+        }
+
+        const totalCount = typeList.length;
+        const positions = new Float32Array(posList);
+        const colors = new Float32Array(colList);
+        const sizes = new Float32Array(sizeList);
+        this.vinylParticleRadii = new Float32Array(totalCount);
+        this.vinylParticleAngles = new Float32Array(totalCount);
+        this.vinylParticleTypes = new Uint8Array(typeList);
+
+        for (let i = 0; i < totalCount; i++) {
+          const x = positions[i*3];
+          const z = positions[i*3+2];
+          this.vinylParticleRadii[i] = Math.sqrt(x*x + z*z);
+          this.vinylParticleAngles[i] = Math.atan2(z, x);
+        }
+
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        geo.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+
+        const mat = new THREE.ShaderMaterial({
+          uniforms: { uPixelRatio: { value: Math.min(devicePixelRatio, 2) } },
+          vertexShader: `
+            attribute float size;
+            attribute vec3 color;
+            varying vec3 vColor;
+            uniform float uPixelRatio;
+            void main() {
+              vec4 mv = modelViewMatrix * vec4(position, 1.0);
+              gl_PointSize = size * uPixelRatio * (320.0 / -mv.z);
+              gl_Position = projectionMatrix * mv;
+              vColor = color;
+            }
+          `,
+          fragmentShader: `
+            varying vec3 vColor;
+            void main() {
+              float d = length(gl_PointCoord - 0.5);
+              if (d > 0.5) discard;
+              float alpha = 1.0 - smoothstep(0.35, 0.5, d);
+              gl_FragColor = vec4(vColor, alpha);
+            }
+          `,
           transparent: true,
-          opacity: 0.6,
-          blending: THREE.AdditiveBlending,
-          depthWrite: false
+          depthWrite: false,
+          depthTest: true,
+          blending: THREE.NormalBlending
         });
-        this.vinylParticles = new THREE.Points(particleGeo, particleMat);
+
+        this.vinylParticles = new THREE.Points(geo, mat);
         this.vinylGroup.add(this.vinylParticles);
-        
+
+        this.vinylParticleCount = totalCount;
+        this.vinylCoverRadius = COVER_R;
+
         this.vinylGroup.visible = false;
         this.scene.add(this.vinylGroup);
+
+        console.log('黑胶粒子总数:', totalCount);
       }
-      updateVinylCoverTexture(url) {
-        if (!url) {
-          this.vinylCoverMesh.material.map = null;
-          this.vinylCoverMesh.material.color.set(0xffffff);
-          this.vinylCoverMesh.material.needsUpdate = true;
-          return;
+      updateVinylCoverParticleColors(sampleFunc) {
+        if (!this.vinylParticles) return;
+        const colors = this.vinylParticles.geometry.attributes.color.array;
+        const count = this.vinylParticleCount;
+        const coverR = this.vinylCoverRadius;
+        for (let i = 0; i < count; i++) {
+          if (this.vinylParticleTypes[i] !== 0) continue;
+          const r = this.vinylParticleRadii[i];
+          const a = this.vinylParticleAngles[i];
+          const x = Math.cos(a) * r;
+          const z = Math.sin(a) * r;
+          // 相机从上方俯视，屏幕右=+X，屏幕上方=-Z
+          const nx = (x / coverR + 1) / 2;
+          // 如果封面上下颠倒，把下面这行改成: const ny = (1 - z / coverR) / 2;
+          const ny = (z / coverR + 1) / 2;
+          const c = sampleFunc(nx, ny);
+          colors[i*3] = c.r;
+          colors[i*3+1] = c.g;
+          colors[i*3+2] = c.b;
         }
-        const img = new Image();
-        img.onload = () => {
-          const texture = new THREE.Texture(img);
-          // 修复镜像：水平翻转
-          texture.wrapS = THREE.RepeatWrapping;
-          texture.repeat.x = -1;
-          texture.offset.x = 1;
-          texture.needsUpdate = true;
-          this.vinylCoverMesh.material.map = texture;
-          this.vinylCoverMesh.material.color.set(0xffffff);
-          this.vinylCoverMesh.material.needsUpdate = true;
-        };
-        img.src = url;
+        this.vinylParticles.geometry.attributes.color.needsUpdate = true;
+      }
+      clearVinylCoverParticleColors() {
+        if (!this.vinylParticles) return;
+        const colors = this.vinylParticles.geometry.attributes.color.array;
+        const count = this.vinylParticleCount;
+        for (let i = 0; i < count; i++) {
+          if (this.vinylParticleTypes[i] !== 0) continue;
+          colors[i*3] = 0.9;
+          colors[i*3+1] = 0.9;
+          colors[i*3+2] = 0.9;
+        }
+        this.vinylParticles.geometry.attributes.color.needsUpdate = true;
       }
       init() {
         this.scene.background = new THREE.Color(0x181828);
@@ -1156,7 +1218,7 @@ Produced by Xiren, TUNE‑Viz Series
         this.mode = newMode;
         this.applyModeVisibility();
         if (this.mode === 'vinyl') {
-          this.camera.position.set(0, 14, 0.01);
+          this.camera.position.set(0, 12, 0.01);
           this.controls.target.set(0, 0, 0);
         } else {
           if (this.mode === 'spectrum' || this.mode === 'both') {
@@ -1249,7 +1311,13 @@ Produced by Xiren, TUNE‑Viz Series
         }
       }
       handleCoverImage(url) {
-        if (!url) { this.spectrum.clearCover(); this.particles.clearCover(); this.updateVinylCoverTexture(null); this.log('清除封面'); return; }
+        if (!url) {
+          this.spectrum.clearCover();
+          this.particles.clearCover();
+          this.clearVinylCoverParticleColors();
+          this.log('清除封面');
+          return;
+        }
         const img = new Image();
         img.onload = () => {
           const canvas = document.createElement('canvas');
@@ -1273,7 +1341,7 @@ Produced by Xiren, TUNE‑Viz Series
           };
           this.spectrum.updateCoverColors(sample);
           this.particles.updateCoverColors(sample);
-          this.updateVinylCoverTexture(url);
+          this.updateVinylCoverParticleColors(sample);
           this.log('封面已加载');
           if (this.mode === 'spectrum' || this.mode === 'both') {
             this.camera.position.set(0, 12, 0.1);
