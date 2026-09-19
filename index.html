@@ -357,7 +357,7 @@ tuneviz.github.io/home
       <div class="setting-group" style="margin-top:10px;"><span class="setting-label">音调</span><input type="range" class="setting-slider" id="pitchSlider" min="0.5" max="1.5" value="1.0" step="0.01"></div>
     </div>
     <div class="setting-divider"></div>
-    <button class="style-btn" id="styleSwitchBtn">切换播放器样式（整体）</button>
+    <button class="style-btn" id="styleSwitchBtn">切换播放器</button>
   </div>
 
   <script type="module">
@@ -2022,7 +2022,7 @@ tuneviz.github.io/home
           } else { this.perfMode = false; this.updateSliderLimits(false); this.perfMonitorEl?.classList.remove('perf-large'); this.log('性能模式关闭'); }
         });
         document.getElementById('styleSwitchBtn').addEventListener('click', () => {
-          window.open('https://www.example.com', '_blank');
+          window.open('https://tuneviz.github.io/HOME);
           this.log('跳转网页');
         });
         if (this.perfMonitorEl) {
