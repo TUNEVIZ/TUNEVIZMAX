@@ -4,6 +4,24 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>TuneViz MAX</title>
+  <script>
+/* 
+  _____ _   _ _  _ ___  __   _____ ____  __  __   _   __  __
+ |_   _| | | | \| | __| \ \ / /_ _|_  / |  \/  | /_\  \ \/ /
+   | | | |_| | .` | _|   \ V / | | / /  | |\/| |/ _ \  >  < 
+   |_|  \___/|_|\_|___|   \_/ |___/___| |_|  |_/_/ \_\/_/\_\
+Produced by Xiren, TUNE‑Viz Series
+矽忈开发
+别看代码了，不妨去试试？
+tuneviz.github.io/home
+*/
+    window.addEventListener('error', function(e) {
+      var div = document.createElement('div');
+      div.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#c62828;color:#fff;padding:10px 16px;z-index:99999;font-family:monospace;font-size:12px;line-height:1.5;';
+      div.textContent = 'JS错误: ' + (e.message || 'unknown') + ' @ ' + (e.filename || '?') + ':' + (e.lineno || '?') + ':' + (e.colno || '?');
+      document.body.appendChild(div);
+    });
+  </script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
   <script type="importmap">
     {
@@ -56,6 +74,7 @@
     .mode-switch-group{
       display:flex;gap:4px;background:var(--glass-bg);backdrop-filter:blur(28px);
       border:1px solid var(--glass-border);border-radius:14px;padding:4px;pointer-events:auto;
+      position: relative;
     }
     .mode-btn{
       padding:8px 18px;border-radius:10px;border:none;cursor:pointer;font-size:0.85rem;font-weight:500;
@@ -63,8 +82,83 @@
     }
     .mode-btn:hover{color:white}
     .mode-btn.active{background:rgba(40,40,65,0.8);color:white;box-shadow:0 4px 10px rgba(0,0,0,0.3)}
+    .vinyl-btn-wrapper{position: relative; display: inline-block;}
+    .sub-btn{
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      margin-top: 6px;
+      padding: 6px 10px;
+      border-radius: 10px;
+      border: 1px solid var(--glass-border);
+      background: var(--glass-bg);
+      backdrop-filter: blur(20px);
+      color: var(--text-secondary);
+      font-size: 0.75rem;
+      cursor: pointer;
+      opacity: 0;
+      transform: translateY(-6px);
+      pointer-events: none;
+      transition: opacity 0.25s ease, transform 0.25s ease, background 0.2s ease;
+      white-space: nowrap;
+      z-index: 200;
+    }
+    .sub-btn.visible{
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+    .sub-btn:hover{background: var(--glass-bg-hover); color: white;}
+    .sub-btn.active{
+      background: rgba(92,156,230,0.45);
+      color: white;
+      border-color: rgba(92,156,230,0.8);
+    }
+    .progress-wrapper{
+      width: 100%;
+      max-width: 700px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      pointer-events: auto;
+    }
+    .hifi-tag{
+      font-size: 0.75rem;
+      letter-spacing: 0.22em;
+      font-weight: 500;
+      pointer-events: none;
+      user-select: none;
+      opacity: 0;
+      transition: opacity 0.4s ease;
+      color: transparent;
+      background: linear-gradient(
+        90deg,
+        rgba(255,255,255,0.30) 0%,
+        rgba(255,255,255,0.30) 40%,
+        rgba(255,255,255,1)    50%,
+        rgba(255,255,255,0.30) 60%,
+        rgba(255,255,255,0.30) 100%
+      );
+      background-size: 200% 100%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: hifiShine 5s linear infinite;
+      animation-play-state: paused;
+    }
+    .hifi-tag.visible{
+      opacity: 1;
+      animation-play-state: running;
+    }
+    @keyframes hifiShine{
+      0%   { background-position:  200% 0; }
+      100% { background-position: -200% 0; }
+    }
     .progress-container{
-      pointer-events:auto;width:100%;max-width:700px;margin:0 auto;background:var(--glass-bg);
+      pointer-events:auto;width:100%;background:var(--glass-bg);
       backdrop-filter:blur(20px);border:1px solid var(--glass-border);border-radius:30px;
       padding:10px 18px;box-shadow:0 15px 35px rgba(0,0,0,0.4);display:flex;align-items:center;gap:10px;
     }
@@ -206,14 +300,20 @@
         <button class="mode-btn active" data-mode="particle">粒子</button>
         <button class="mode-btn" data-mode="spectrum">频谱</button>
         <button class="mode-btn" data-mode="both">混合</button>
-        <button class="mode-btn" data-mode="vinyl">黑胶</button>
+        <div class="vinyl-btn-wrapper">
+          <button class="mode-btn" data-mode="vinyl">黑胶</button>
+          <button class="sub-btn" id="btnVinylCover">封面</button>
+        </div>
       </div>
     </div>
     <div style="flex:1;"></div>
-    <div class="progress-container">
-      <span style="color:white;font-family:monospace" id="currentTimeLabel">00:00</span>
-      <div class="progress-bar-bg" id="progressBarBg"><div class="progress-fill" id="progressFill"></div></div>
-      <span style="color:white;font-family:monospace" id="durationLabel">00:00</span>
+    <div class="progress-wrapper">
+      <div class="hifi-tag" id="hifiTag">高清音质 · 智能调音</div>
+      <div class="progress-container">
+        <span style="color:white;font-family:monospace" id="currentTimeLabel">00:00</span>
+        <div class="progress-bar-bg" id="progressBarBg"><div class="progress-fill" id="progressFill"></div></div>
+        <span style="color:white;font-family:monospace" id="durationLabel">00:00</span>
+      </div>
     </div>
     <div class="bottom-panel">
       <button class="control-btn" id="btnPrev">⏮️</button>
@@ -282,6 +382,19 @@
       shakeIntensity: { defaultMax: 2, perfMax: 5 }
     };
 
+    const SMART_EQ_BANDS = [
+      { freq: 31,    gain: -1 },
+      { freq: 62,    gain: +1 },
+      { freq: 125,   gain: +1 },
+      { freq: 250,   gain: -2 },
+      { freq: 500,   gain: -1 },
+      { freq: 1000,  gain: +1 },
+      { freq: 2000,  gain: -1 },
+      { freq: 4000,  gain: +2 },
+      { freq: 8000,  gain: +1 },
+      { freq: 16000, gain: +1 }
+    ];
+
     function showToast(message) {
       const toast = document.getElementById('toast');
       if (!toast) return;
@@ -324,15 +437,26 @@
         this.splitter=null; this.midGain=null; this.sideGain=null;
         this.midSum=null; this.sideDiff=null; this.midMerger=null; this.sideMerger=null;
         this.sideLeft=null; this.sideRight=null;
+        this.eqNodes = [];
         this.freqData=null; this.timeData=null;
         this.fftSize=2048; this.isPlaying=false;
         this.duration=0;
         this._startTime=0; this._pauseTime=0;
         this._playbackRate=1.0;
         this._pitchDebounceTimer=null;
-        this.beatThreshold=0.75; this.beatCooldown=0;
         this.energyHistory=[]; this.beatCallback=null;
         this._playAttempted = false;
+
+        this.BEAT_RISE_RATIO = 1.5;
+        this.BEAT_MIN_ENERGY = 0.05;
+        this.BEAT_COOLDOWN_MS = 75;
+        this.BEAT_HISTORY_FRAMES = 60;
+        this.BEAT_MIN_HISTORY_FRAMES = 18;
+        this.BEAT_OVERRIDE_RATIO = 1.1;
+        this.BEAT_STRENGTH_DIVISOR = 0.5;
+
+        this._lastBeatTime = 0;
+        this._lastBeatRatio = 0;
       }
       async init() {
         if (this.ctx) return;
@@ -382,7 +506,21 @@
           this.stereoPanner = this.ctx.createStereoPanner();
           this.midGain.connect(this.stereoPanner);
           this.sideGain.connect(this.stereoPanner);
-          this.stereoPanner.connect(this.ctx.destination);
+
+          this.eqNodes = SMART_EQ_BANDS.map(band => {
+            const f = this.ctx.createBiquadFilter();
+            f.type = 'peaking';
+            f.frequency.value = band.freq;
+            f.Q.value = 1.0;
+            f.gain.value = band.gain;
+            return f;
+          });
+          this.stereoPanner.connect(this.eqNodes[0]);
+          for (let i = 0; i < this.eqNodes.length - 1; i++) {
+            this.eqNodes[i].connect(this.eqNodes[i + 1]);
+          }
+          this.eqNodes[this.eqNodes.length - 1].connect(this.ctx.destination);
+
           this.setVocalMix(0);
           this.setBalance(0);
           this.setPitch(1.0);
@@ -492,18 +630,63 @@
       fmt(s) { const m=Math.floor(s/60), sec=Math.floor(s%60); return `${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`; }
       updateFreq() { this.analyser?.getByteFrequencyData(this.freqData); }
       updateTime() { this.analyser?.getByteTimeDomainData(this.timeData); }
+
       detectBeat() {
-        if (!this.timeData || this.beatCooldown>0) { this.beatCooldown--; return false; }
-        let sum=0;
-        for (let i=0;i<this.timeData.length;i++){ const v=(this.timeData[i]-128)/128; sum+=v*v; }
-        const energy=Math.sqrt(sum/this.timeData.length);
+        if (!this.timeData) return { isBeat: false, strength: 0, energy: 0 };
+
+        let sum = 0;
+        for (let i = 0; i < this.timeData.length; i++) {
+          const v = (this.timeData[i] - 128) / 128;
+          sum += v * v;
+        }
+        const energy = Math.sqrt(sum / this.timeData.length);
+
         this.energyHistory.push(energy);
-        if (this.energyHistory.length>43) this.energyHistory.shift();
-        if (this.energyHistory.length<43) return false;
-        const avg=this.energyHistory.reduce((a,b)=>a+b,0)/this.energyHistory.length;
-        if (energy>avg*1.4 && energy>this.beatThreshold) { this.beatCooldown=8; this.beatCallback?.(energy); return true; }
-        return false;
+        if (this.energyHistory.length > this.BEAT_HISTORY_FRAMES) {
+          this.energyHistory.shift();
+        }
+
+        if (this.energyHistory.length < this.BEAT_MIN_HISTORY_FRAMES) return { isBeat: false, strength: 0, energy };
+
+        let histSum = 0;
+        for (let i = 0; i < this.energyHistory.length; i++) histSum += this.energyHistory[i];
+        const avg = histSum / this.energyHistory.length;
+
+        const ratio = avg > 0.0001 ? energy / avg : 0;
+
+        const now = performance.now();
+
+        const isRising = (ratio > this.BEAT_RISE_RATIO) && (energy > this.BEAT_MIN_ENERGY);
+
+        if (!isRising) {
+          if (ratio < 1.0) {
+            this._lastBeatRatio = 0;
+          }
+          return { isBeat: false, strength: 0, energy };
+        }
+
+        const rawStrength = (ratio - this.BEAT_RISE_RATIO) * energy;
+        let strength = Math.min(1, rawStrength / this.BEAT_STRENGTH_DIVISOR);
+        strength = Math.max(0.3, strength);
+
+        const timeSinceLastBeat = now - this._lastBeatTime;
+
+        if (timeSinceLastBeat < this.BEAT_COOLDOWN_MS) {
+          if (ratio > this._lastBeatRatio * this.BEAT_OVERRIDE_RATIO) {
+            this._lastBeatTime = now;
+            this._lastBeatRatio = ratio;
+            this.beatCallback?.(strength);
+            return { isBeat: true, strength, energy };
+          }
+          return { isBeat: false, strength: 0, energy };
+        }
+
+        this._lastBeatTime = now;
+        this._lastBeatRatio = ratio;
+        this.beatCallback?.(strength);
+        return { isBeat: true, strength, energy };
       }
+
       setBalance(val) { if (this.stereoPanner) this.stereoPanner.pan.value = val; }
       setVocalMix(val) {
         if (this.midGain && this.sideGain) {
@@ -578,6 +761,28 @@
         this.renderPanel();
         if (addedSong > 0) showToast('已导入歌曲，点击播放按钮开始播放');
       }
+      // === 自动匹配同名 lrc：先完全同名，再忽略大小写 ===
+      _autoMatchLyric(songName) {
+        if (!songName || this.lyrics.length === 0) {
+          this.currentLyricIndex = -1;
+          this.lyricCallback?.([]);
+          return;
+        }
+        // 1) 完全同名
+        let matchIdx = this.lyrics.findIndex(l => l.name === songName);
+        // 2) 忽略大小写
+        if (matchIdx === -1) {
+          const lower = songName.toLowerCase();
+          matchIdx = this.lyrics.findIndex(l => l.name.toLowerCase() === lower);
+        }
+        if (matchIdx !== -1) {
+          this.currentLyricIndex = matchIdx;
+          this.lyricCallback?.(this.lyrics[matchIdx].data);
+        } else {
+          this.currentLyricIndex = -1;
+          this.lyricCallback?.([]);
+        }
+      }
       playSong(index) {
         if (index < 0 || index >= this.songs.length) return;
         this.currentIndex = index;
@@ -585,6 +790,10 @@
         this.audio.playFile(song.file);
         this.loadedIndex = index;
         this.onSongChange?.(song);
+
+        // === 自动应用同名 lrc ===
+        this._autoMatchLyric(song.name);
+
         this.renderPanel();
         if (this.coverCallback) this.coverCallback(null);
         if (song.file.name.toLowerCase().endsWith('.mp3')) this.extractMP3Cover(song.file);
@@ -723,7 +932,7 @@
           const color = this.coverSampleFunc(nx, ny);
           this.col[i3] = color.r; this.col[i3+1] = color.g; this.col[i3+2] = color.b;
         } else {
-          const c=new THREE.Color().setHSL(0.58+Math.random()*0.25,0.8,0.6);
+          const c=new THREE.Color().setHSL(0.55+Math.random()*0.13,0.8,0.6);
           this.col[i3]=c.r; this.col[i3+1]=c.g; this.col[i3+2]=c.b;
         }
         this.siz[i]=0.08+Math.random()*0.5;
@@ -745,7 +954,7 @@
         this.hasCover = false; this.coverSampleFunc = null;
         for (let i=0; i<this.count; i++) {
           const i3=i*3;
-          const c=new THREE.Color().setHSL(0.58+Math.random()*0.25,0.8,0.6);
+          const c=new THREE.Color().setHSL(0.55+Math.random()*0.13,0.8,0.6);
           this.col[i3]=c.r; this.col[i3+1]=c.g; this.col[i3+2]=c.b;
         }
         this.geo.attributes.color.needsUpdate = true;
@@ -760,7 +969,7 @@
           const sp=1+lo*2.0; this.pos[i3]+=this.vel[i3]*sp*dt*18; this.pos[i3+1]+=this.vel[i3+1]*sp*dt*18; this.pos[i3+2]+=this.vel[i3+2]*sp*dt*18;
           if(Math.abs(this.pos[i3])>16) this.vel[i3]*=-0.8; if(Math.abs(this.pos[i3+1])>16) this.vel[i3+1]*=-0.8; if(Math.abs(this.pos[i3+2])>16) this.vel[i3+2]*=-0.8;
           if (!this.hasCover) {
-            const e=lo*0.6+mi*0.3+hi*0.1, color=new THREE.Color().setHSL(0.55+e*0.2,0.8,0.4+e*0.3);
+            const e=lo*0.6+mi*0.3+hi*0.1, color=new THREE.Color().setHSL(0.53+e*0.09,0.8,0.4+e*0.3);
             this.col[i3]=color.r; this.col[i3+1]=color.g; this.col[i3+2]=color.b;
           }
           this.siz[i]=Math.max(0.06, (0.15+(this.hasCover?0.3:1.4))*szMul);
@@ -788,6 +997,30 @@
         this.coverSampleFunc = null;
         this.create();
       }
+      static makeBarMaterial() {
+        const mat = new THREE.MeshStandardMaterial({
+          color: 0x4488ff,
+          emissive: new THREE.Color(0x335577),
+          roughness: 0.3,
+          metalness: 0.2,
+          transparent: true,
+          depthWrite: false
+        });
+        mat.onBeforeCompile = (shader) => {
+          shader.vertexShader = 'varying float vLocalY;\n' + shader.vertexShader;
+          shader.vertexShader = shader.vertexShader.replace(
+            '#include <begin_vertex>',
+            '#include <begin_vertex>\nvLocalY = position.y + 0.5;'
+          );
+          shader.fragmentShader = 'varying float vLocalY;\n' + shader.fragmentShader;
+          shader.fragmentShader = shader.fragmentShader.replace(
+            '#include <dithering_fragment>',
+            '#include <dithering_fragment>\ngl_FragColor.a *= smoothstep(0.0, 0.35, vLocalY);'
+          );
+        };
+        mat.customProgramCacheKey = () => 'barFadeMaterial_v1';
+        return mat;
+      }
       create(){
         this.bars.forEach(b=>{ this.scene.remove(b); b.material.dispose(); b.geometry.dispose(); });
         this.bars=[];
@@ -805,9 +1038,7 @@
           const freqRatio=1-(l/(layers-1));
           for(let i=0;i<cnt;i++){
             const angle=(i/cnt)*Math.PI*2;
-            const bar=new THREE.Mesh(this.geo, new THREE.MeshStandardMaterial({
-              color:0x4488ff, emissive:new THREE.Color(0x335577), roughness:0.3, metalness:0.2
-            }));
+            const bar=new THREE.Mesh(this.geo, RadialSpectrum.makeBarMaterial());
             bar.position.set(Math.cos(angle)*r,0,Math.sin(angle)*r);
             bar.userData.freqRatio=freqRatio;
             bar.visible = this.visible;
@@ -834,8 +1065,8 @@
         for (let i=0; i<this.bars.length; i++) {
           const bar = this.bars[i];
           const ratio = bar.userData.freqRatio;
-          bar.material.color.setHSL(0.6+ratio*0.35,0.9,0.5+ratio*0.3);
-          bar.material.emissive.setHSL(0.6+ratio*0.35,0.8,0.2);
+          bar.material.color.setHSL(0.55+ratio*0.11,0.9,0.5+ratio*0.3);
+          bar.material.emissive.setHSL(0.55+ratio*0.11,0.8,0.2);
         }
       }
       update(freq,gain,smooth){
@@ -851,8 +1082,8 @@
           this.smoothVals[i]+=(target-this.smoothVals[i])*(1-smooth);
           bar.scale.y=this.smoothVals[i]; bar.position.y=this.smoothVals[i]/2;
           if (!this.coverSampleFunc) {
-            bar.material.color.setHSL(0.6+ratio*0.35,0.9,0.5+ratio*0.3);
-            bar.material.emissive.setHSL(0.6+ratio*0.35,0.8,0.2);
+            bar.material.color.setHSL(0.55+ratio*0.11,0.9,0.5+ratio*0.3);
+            bar.material.emissive.setHSL(0.55+ratio*0.11,0.8,0.2);
           }
         }
       }
@@ -902,23 +1133,118 @@
         }
         this.mesh.lookAt(this.camera.position);
       }
+      _smartWrap(ctx, text, maxWidth, maxLines) {
+        const tokens = [];
+        let i = 0;
+        while (i < text.length) {
+          const ch = text[i];
+          if (/[A-Za-z0-9'\-]/.test(ch)) {
+            let j = i;
+            while (j < text.length && /[A-Za-z0-9'\-]/.test(text[j])) j++;
+            tokens.push({ text: text.slice(i, j), breakable: true });
+            i = j;
+            continue;
+          }
+          if (/\s/.test(ch)) {
+            let j = i;
+            while (j < text.length && /\s/.test(text[j])) j++;
+            tokens.push({ text: text.slice(i, j), breakable: true });
+            i = j;
+            continue;
+          }
+          tokens.push({ text: ch, breakable: true });
+          i++;
+        }
+
+        const lines = [];
+        let lineStart = 0;
+
+        while (lineStart < tokens.length) {
+          if (lines.length === maxLines - 1) {
+            let restText = tokens.slice(lineStart).map(t => t.text).join('');
+            if (ctx.measureText(restText).width > maxWidth) {
+              while (restText.length > 0 && ctx.measureText(restText + '...').width > maxWidth) {
+                restText = restText.slice(0, -1);
+              }
+              restText = restText + '...';
+            }
+            lines.push(restText.replace(/\s+$/, ''));
+            break;
+          }
+
+          let curText = '';
+          let lastFit = lineStart;
+          let lastBreakFit = -1;
+          let j = lineStart;
+          while (j < tokens.length) {
+            const test = curText + tokens[j].text;
+            if (ctx.measureText(test).width <= maxWidth) {
+              curText = test;
+              j++;
+              lastFit = j;
+              if (tokens[j - 1].breakable) lastBreakFit = j;
+            } else {
+              break;
+            }
+          }
+
+          let breakPoint;
+          if (lastBreakFit > lineStart) breakPoint = lastBreakFit;
+          else if (lastFit > lineStart) breakPoint = lastFit;
+          else breakPoint = lineStart + 1;
+
+          const forbiddenHead = '，。！？；：、）】》」』〕｝〗〙〛>)]}"\'!?,.;:';
+          while (breakPoint < tokens.length && forbiddenHead.indexOf(tokens[breakPoint].text[0]) !== -1) {
+            breakPoint++;
+          }
+
+          const lineText = tokens.slice(lineStart, breakPoint).map(t => t.text).join('').replace(/\s+$/, '');
+          lines.push(lineText);
+          lineStart = breakPoint;
+        }
+
+        return lines;
+      }
       _updateTexture() {
         const ctx = this.ctx;
-        ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        const W = this.canvas.width;
+        const H = this.canvas.height;
+        ctx.clearRect(0, 0, W, H);
         const color = this.lyricColor;
         const currentLyric = this.currentIndex >= 0 ? this.lyrics[this.currentIndex].lyric : '';
         const nextLyric = this.currentIndex + 1 < this.lyrics.length ? this.lyrics[this.currentIndex + 1].lyric : '';
+
         ctx.fillStyle = color;
-        ctx.font = 'bold 72px "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(currentLyric || '♪ 暂无歌词 ♪', this.canvas.width / 2, this.canvas.height / 2 - 30);
+
+        const MAX_LINES = 2;
+        const LINE_YS = [98, 174];
+        const NEXT_Y = 222;
+        const MAX_WIDTH = W - 40;
+
+        ctx.font = 'bold 72px "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif';
+        const displayText = currentLyric || '♪ 暂无歌词 ♪';
+        const lines = this._smartWrap(ctx, displayText, MAX_WIDTH, MAX_LINES);
+
+        for (let k = 0; k < lines.length && k < MAX_LINES; k++) {
+          ctx.fillText(lines[k], W / 2, LINE_YS[k]);
+        }
+
         if (nextLyric) {
           ctx.font = '40px "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif';
           ctx.globalAlpha = 0.5;
-          ctx.fillText(nextLyric, this.canvas.width / 2, this.canvas.height / 2 + 60);
+          let nextDisplay = nextLyric;
+          if (ctx.measureText(nextDisplay).width > MAX_WIDTH) {
+            while (nextDisplay.length > 0 && ctx.measureText(nextDisplay + '...').width > MAX_WIDTH) {
+              nextDisplay = nextDisplay.slice(0, -1);
+            }
+            nextDisplay = nextDisplay + '...';
+          }
+          ctx.fillText(nextDisplay, W / 2, NEXT_Y);
           ctx.globalAlpha = 1;
         }
+
         this.texture.needsUpdate = true;
       }
       setVisible(visible) {
@@ -929,6 +1255,140 @@
         this.geometry.dispose();
         this.material.dispose();
         this.texture.dispose();
+      }
+    }
+
+    class BurstParticles {
+      constructor(scene, maxCount = 4000) {
+        this.scene = scene;
+        this.maxCount = maxCount;
+        this.cursor = 0;
+
+        this.positions = new Float32Array(maxCount * 3);
+        this.colors = new Float32Array(maxCount * 3);
+        this.sizes = new Float32Array(maxCount);
+        this.alphas = new Float32Array(maxCount);
+        this.velocities = new Float32Array(maxCount * 3);
+        this.lives = new Float32Array(maxCount);
+        this.maxLives = new Float32Array(maxCount);
+
+        for (let i = 0; i < maxCount; i++) {
+          this.positions[i*3+1] = -9999;
+          this.alphas[i] = 0;
+          this.sizes[i] = 0.1;
+        }
+
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
+        geo.setAttribute('color', new THREE.BufferAttribute(this.colors, 3));
+        geo.setAttribute('size', new THREE.BufferAttribute(this.sizes, 1));
+        geo.setAttribute('alpha', new THREE.BufferAttribute(this.alphas, 1));
+
+        const mat = new THREE.ShaderMaterial({
+          uniforms: { uPixelRatio: { value: Math.min(devicePixelRatio, 2) } },
+          vertexShader: `
+            attribute float size;
+            attribute vec3 color;
+            attribute float alpha;
+            varying vec3 vColor;
+            varying float vAlpha;
+            uniform float uPixelRatio;
+            void main() {
+              vec4 mv = modelViewMatrix * vec4(position, 1.0);
+              gl_PointSize = size * uPixelRatio * (300.0 / -mv.z);
+              gl_Position = projectionMatrix * mv;
+              vColor = color;
+              vAlpha = alpha;
+            }
+          `,
+          fragmentShader: `
+            varying vec3 vColor;
+            varying float vAlpha;
+            void main() {
+              float d = length(gl_PointCoord - 0.5);
+              if (d > 0.5) discard;
+              float a = (1.0 - smoothstep(0.25, 0.5, d)) * vAlpha;
+              gl_FragColor = vec4(vColor, a);
+            }
+          `,
+          transparent: true,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending
+        });
+
+        this.points = new THREE.Points(geo, mat);
+        this.points.frustumCulled = false;
+        this.scene.add(this.points);
+        this.geo = geo;
+      }
+
+      burst(count, centerX, centerZ, radius, baseColor, speedMul = 1.0) {
+        for (let k = 0; k < count; k++) {
+          const i = this.cursor;
+          this.cursor = (this.cursor + 1) % this.maxCount;
+
+          const a = Math.random() * Math.PI * 2;
+          const px = centerX + Math.cos(a) * radius;
+          const pz = centerZ + Math.sin(a) * radius;
+          const py = (Math.random() - 0.5) * 0.6;
+
+          this.positions[i*3] = px;
+          this.positions[i*3+1] = py;
+          this.positions[i*3+2] = pz;
+
+          const speed = (2.5 + Math.random() * 4.0) * speedMul;
+          const vy = (Math.random() - 0.15) * 2.5 * speedMul;
+          this.velocities[i*3] = Math.cos(a) * speed;
+          this.velocities[i*3+1] = vy;
+          this.velocities[i*3+2] = Math.sin(a) * speed;
+
+          if (baseColor) {
+            this.colors[i*3] = Math.min(1, baseColor.r * 1.4 + 0.25);
+            this.colors[i*3+1] = Math.min(1, baseColor.g * 1.4 + 0.25);
+            this.colors[i*3+2] = Math.min(1, baseColor.b * 1.4 + 0.25);
+          } else {
+            const c = new THREE.Color().setHSL(Math.random(), 0.9, 0.65);
+            this.colors[i*3] = c.r;
+            this.colors[i*3+1] = c.g;
+            this.colors[i*3+2] = c.b;
+          }
+
+          this.sizes[i] = (0.12 + Math.random() * 0.16) * Math.min(1.5, speedMul);
+          const life = 0.8 + Math.random() * 0.9;
+          this.lives[i] = life;
+          this.maxLives[i] = life;
+          this.alphas[i] = 1.0;
+        }
+        this.geo.attributes.position.needsUpdate = true;
+        this.geo.attributes.color.needsUpdate = true;
+        this.geo.attributes.size.needsUpdate = true;
+        this.geo.attributes.alpha.needsUpdate = true;
+      }
+
+      update(dt) {
+        let any = false;
+        for (let i = 0; i < this.maxCount; i++) {
+          if (this.lives[i] <= 0) continue;
+          any = true;
+          this.lives[i] -= dt;
+          if (this.lives[i] <= 0) {
+            this.alphas[i] = 0;
+            this.positions[i*3+1] = -9999;
+            continue;
+          }
+          this.velocities[i*3+1] -= 2.0 * dt;
+          this.positions[i*3]   += this.velocities[i*3]   * dt;
+          this.positions[i*3+1] += this.velocities[i*3+1] * dt;
+          this.positions[i*3+2] += this.velocities[i*3+2] * dt;
+          const damp = Math.max(0, 1 - 0.9 * dt);
+          this.velocities[i*3] *= damp;
+          this.velocities[i*3+2] *= damp;
+          this.alphas[i] = Math.max(0, this.lives[i] / this.maxLives[i]);
+        }
+        if (any) {
+          this.geo.attributes.position.needsUpdate = true;
+          this.geo.attributes.alpha.needsUpdate = true;
+        }
       }
     }
 
@@ -974,6 +1434,8 @@
         this.lastFrameTime = performance.now(); this.lastPerfUpdate = performance.now();
         this.perfMonitorEl = document.getElementById('perfMonitor');
         this.isDraggingMonitor = false; this.monitorDragOffset = { x: 0, y: 0 };
+        this._hifiShown = false;
+
         this.vinylGroup = null;
         this.vinylParticles = null;
         this.vinylParticleRadii = null;
@@ -981,7 +1443,18 @@
         this.vinylParticleTypes = null;
         this.vinylParticleCount = 0;
         this.vinylCoverRadius = 3.3;
-        this.initVinylModel();
+
+        this.bigCoverGroup = null;
+        this.bigCoverMesh = null;
+        this.bigCoverTopMat = null;
+        this.bigCoverRadius = 4.5;
+        this.lastCoverColor = null;
+
+        this.burstParticles = null;
+
+        try { this.initVinylModel(); } catch(e) { console.error('initVinylModel 失败:', e); }
+        try { this.initBigCover(); } catch(e) { console.error('initBigCover 失败:', e); }
+        try { this.initBurstParticles(); } catch(e) { console.error('initBurstParticles 失败:', e); }
         this.init();
       }
       log(message) {
@@ -1003,41 +1476,49 @@
         const GROOVE_END = 4.95;
         const EDGE_END = 5.0;
 
-        // 收集所有粒子的属性
-        const posList = [];
-        const colList = [];
-        const sizeList = [];
-        const typeList = []; // 0=cover, 1=groove, 2=edge, 3=transition
+        const COVER_COUNT = 40000;
+        const TRANS_COUNT = 2000;
+        const GROOVE_CIRCLES = 100;
+        const PARTICLES_PER_GROOVE = 250;
+        const EDGE_COUNT = 1500;
 
-        // === 1. 封面区：面积均匀分布 ===
-        const COVER_COUNT = 120000;
+        const totalCount = COVER_COUNT + TRANS_COUNT + GROOVE_CIRCLES * PARTICLES_PER_GROOVE + EDGE_COUNT;
+
+        const positions = new Float32Array(totalCount * 3);
+        const colors = new Float32Array(totalCount * 3);
+        const sizes = new Float32Array(totalCount);
+        const types = new Uint8Array(totalCount);
+
+        let idx = 0;
+
         for (let i = 0; i < COVER_COUNT; i++) {
           const r = Math.sqrt(Math.random() * (COVER_R * COVER_R - HOLE_R * HOLE_R) + HOLE_R * HOLE_R);
           const a = Math.random() * Math.PI * 2;
-          const x = Math.cos(a) * r;
-          const z = Math.sin(a) * r;
-          posList.push(x, 0, z);
-          colList.push(0.9, 0.9, 0.9);
-          sizeList.push(0.06);
-          typeList.push(0);
+          positions[idx*3] = Math.cos(a) * r;
+          positions[idx*3+1] = 0;
+          positions[idx*3+2] = Math.sin(a) * r;
+          colors[idx*3] = 0.9;
+          colors[idx*3+1] = 0.9;
+          colors[idx*3+2] = 0.9;
+          sizes[idx] = 0.06;
+          types[idx] = 0;
+          idx++;
         }
 
-        // === 2. 过渡带 ===
-        const TRANS_COUNT = 4000;
         for (let i = 0; i < TRANS_COUNT; i++) {
           const r = COVER_R + Math.random() * (TRANSITION_END - COVER_R);
           const a = Math.random() * Math.PI * 2;
-          const x = Math.cos(a) * r;
-          const z = Math.sin(a) * r;
-          posList.push(x, 0, z);
-          colList.push(0.06, 0.06, 0.08);
-          sizeList.push(0.04);
-          typeList.push(3);
+          positions[idx*3] = Math.cos(a) * r;
+          positions[idx*3+1] = 0;
+          positions[idx*3+2] = Math.sin(a) * r;
+          colors[idx*3] = 0.06;
+          colors[idx*3+1] = 0.06;
+          colors[idx*3+2] = 0.08;
+          sizes[idx] = 0.04;
+          types[idx] = 3;
+          idx++;
         }
 
-        // === 3. 沟槽区：同心圆排列，亮度交替形成刻痕感 ===
-        const GROOVE_CIRCLES = 100;
-        const PARTICLES_PER_GROOVE = 800;
         for (let g = 0; g < GROOVE_CIRCLES; g++) {
           const baseR = GROOVE_START + (g / (GROOVE_CIRCLES - 1)) * (GROOVE_END - GROOVE_START);
           const isBright = (g % 2 === 0);
@@ -1048,36 +1529,36 @@
             const jitterA = (Math.random() - 0.5) * angleStep * 0.7;
             const r = baseR + jitterR;
             const a = i * angleStep + jitterA;
-            const x = Math.cos(a) * r;
-            const z = Math.sin(a) * r;
-            posList.push(x, 0, z);
+            positions[idx*3] = Math.cos(a) * r;
+            positions[idx*3+1] = 0;
+            positions[idx*3+2] = Math.sin(a) * r;
             const jitterC = baseColor + Math.random() * 0.02;
-            colList.push(jitterC * 0.85, jitterC * 0.85, jitterC);
-            sizeList.push(0.035);
-            typeList.push(1);
+            colors[idx*3] = jitterC * 0.85;
+            colors[idx*3+1] = jitterC * 0.85;
+            colors[idx*3+2] = jitterC;
+            sizes[idx] = 0.035;
+            types[idx] = 1;
+            idx++;
           }
         }
 
-        // === 4. 边缘：略亮的勾勒线 ===
-        const EDGE_COUNT = 2500;
         for (let i = 0; i < EDGE_COUNT; i++) {
           const r = GROOVE_END + Math.random() * (EDGE_END - GROOVE_END);
           const a = Math.random() * Math.PI * 2;
-          const x = Math.cos(a) * r;
-          const z = Math.sin(a) * r;
-          posList.push(x, 0, z);
-          colList.push(0.28, 0.28, 0.35);
-          sizeList.push(0.06);
-          typeList.push(2);
+          positions[idx*3] = Math.cos(a) * r;
+          positions[idx*3+1] = 0;
+          positions[idx*3+2] = Math.sin(a) * r;
+          colors[idx*3] = 0.22;
+          colors[idx*3+1] = 0.32;
+          colors[idx*3+2] = 0.55;
+          sizes[idx] = 0.06;
+          types[idx] = 2;
+          idx++;
         }
 
-        const totalCount = typeList.length;
-        const positions = new Float32Array(posList);
-        const colors = new Float32Array(colList);
-        const sizes = new Float32Array(sizeList);
         this.vinylParticleRadii = new Float32Array(totalCount);
         this.vinylParticleAngles = new Float32Array(totalCount);
-        this.vinylParticleTypes = new Uint8Array(typeList);
+        this.vinylParticleTypes = types;
 
         for (let i = 0; i < totalCount; i++) {
           const x = positions[i*3];
@@ -1128,8 +1609,6 @@
 
         this.vinylGroup.visible = false;
         this.scene.add(this.vinylGroup);
-
-        console.log('黑胶粒子总数:', totalCount);
       }
       updateVinylCoverParticleColors(sampleFunc) {
         if (!this.vinylParticles) return;
@@ -1142,9 +1621,7 @@
           const a = this.vinylParticleAngles[i];
           const x = Math.cos(a) * r;
           const z = Math.sin(a) * r;
-          // 相机从上方俯视，屏幕右=+X，屏幕上方=-Z
           const nx = (x / coverR + 1) / 2;
-          // 如果封面上下颠倒，把下面这行改成: const ny = (1 - z / coverR) / 2;
           const ny = (z / coverR + 1) / 2;
           const c = sampleFunc(nx, ny);
           colors[i*3] = c.r;
@@ -1164,6 +1641,56 @@
           colors[i*3+2] = 0.9;
         }
         this.vinylParticles.geometry.attributes.color.needsUpdate = true;
+      }
+      initBigCover() {
+        this.bigCoverGroup = new THREE.Group();
+
+        const radius = this.bigCoverRadius;
+        const thickness = 0.7;
+        const geo = new THREE.CylinderGeometry(radius, radius, thickness, 96, 1, false);
+
+        const sideMat = new THREE.MeshStandardMaterial({
+          color: 0x0a0a14,
+          roughness: 0.35,
+          metalness: 0.9,
+          emissive: 0x111122,
+          emissiveIntensity: 0.25
+        });
+        this.bigCoverTopMat = new THREE.MeshStandardMaterial({
+          color: 0x2a2a35,
+          roughness: 0.55,
+          metalness: 0.1,
+          side: THREE.FrontSide
+        });
+        const bottomMat = new THREE.MeshBasicMaterial({ color: 0x0a0a12, side: THREE.FrontSide });
+
+        this.bigCoverMesh = new THREE.Mesh(geo, [sideMat, this.bigCoverTopMat, bottomMat]);
+        this.bigCoverMesh.rotation.y = Math.PI / 2;
+        this.bigCoverGroup.add(this.bigCoverMesh);
+
+        this.bigCoverGroup.visible = false;
+        this.scene.add(this.bigCoverGroup);
+      }
+      updateBigCoverTexture(url) {
+        if (!this.bigCoverTopMat) return;
+        if (!url) {
+          this.bigCoverTopMat.map = null;
+          this.bigCoverTopMat.color.set(0x2a2a35);
+          this.bigCoverTopMat.needsUpdate = true;
+          return;
+        }
+        const img = new Image();
+        img.onload = () => {
+          const tex = new THREE.Texture(img);
+          tex.needsUpdate = true;
+          this.bigCoverTopMat.map = tex;
+          this.bigCoverTopMat.color.set(0xffffff);
+          this.bigCoverTopMat.needsUpdate = true;
+        };
+        img.src = url;
+      }
+      initBurstParticles() {
+        this.burstParticles = new BurstParticles(this.scene, 4000);
       }
       init() {
         this.scene.background = new THREE.Color(0x181828);
@@ -1196,7 +1723,11 @@
         this.controls.maxPolarAngle=Math.PI*0.65;
         this.controls.update();
         this.applyModeVisibility();
-        this.audio.beatCallback = (e) => { this.shakeAmount = Math.min(e*2.0, 1.0); this.log('检测到鼓点'); };
+        this.audio.beatCallback = (strength) => {
+          const sliderValue = +document.getElementById('shakeIntensity')?.value ?? 0.8;
+          this.shakeAmount = strength * sliderValue;
+          this.log('鼓点触发，强度: ' + strength.toFixed(2));
+        };
         this.bindEvents();
         this.animate();
         this.log('应用初始化完成');
@@ -1207,8 +1738,9 @@
         this.particles.visible = showGlobalParticles;
         if (this.particles.points) this.particles.points.visible = showGlobalParticles;
         this.spectrum.setVisible(showSpectrum);
-        this.vinylGroup.visible = (this.mode === 'vinyl');
-        if (this.mode === 'vinyl') {
+        if (this.vinylGroup) this.vinylGroup.visible = (this.mode === 'vinyl');
+        if (this.bigCoverGroup) this.bigCoverGroup.visible = (this.mode === 'vinylcover');
+        if (this.mode === 'vinyl' || this.mode === 'vinylcover') {
           this.controls.autoRotate = false;
         } else {
           this.controls.autoRotate = document.getElementById('autoRotateToggle')?.checked ?? true;
@@ -1217,17 +1749,26 @@
       setMode(newMode) {
         this.mode = newMode;
         this.applyModeVisibility();
+
+        const subBtn = document.getElementById('btnVinylCover');
+        if (subBtn) {
+          const isVinylFamily = (newMode === 'vinyl' || newMode === 'vinylcover');
+          subBtn.classList.toggle('visible', isVinylFamily);
+          subBtn.classList.toggle('active', newMode === 'vinylcover');
+        }
+
         if (this.mode === 'vinyl') {
           this.camera.position.set(0, 12, 0.01);
           this.controls.target.set(0, 0, 0);
+        } else if (this.mode === 'vinylcover') {
+          this.camera.position.set(0, 9, 4.0);
+          this.controls.target.set(0, 0, 0);
+        } else if (this.mode === 'spectrum' || this.mode === 'both') {
+          this.camera.position.set(0, 12, 0.1);
+          this.controls.target.set(0, 0, 0);
         } else {
-          if (this.mode === 'spectrum' || this.mode === 'both') {
-            this.camera.position.set(0, 12, 0.1);
-            this.controls.target.set(0, 0, 0);
-          } else {
-            this.camera.position.set(0, 2.5, 15);
-            this.controls.target.set(0, 0.5, 0);
-          }
+          this.camera.position.set(0, 2.5, 15);
+          this.controls.target.set(0, 0.5, 0);
         }
         this.controls.update();
         this.log('切换到模式: ' + this.mode);
@@ -1315,6 +1856,8 @@
           this.spectrum.clearCover();
           this.particles.clearCover();
           this.clearVinylCoverParticleColors();
+          this.updateBigCoverTexture(null);
+          this.lastCoverColor = null;
           this.log('清除封面');
           return;
         }
@@ -1342,12 +1885,9 @@
           this.spectrum.updateCoverColors(sample);
           this.particles.updateCoverColors(sample);
           this.updateVinylCoverParticleColors(sample);
+          this.updateBigCoverTexture(url);
+          this.lastCoverColor = sample(0.5, 0.5);
           this.log('封面已加载');
-          if (this.mode === 'spectrum' || this.mode === 'both') {
-            this.camera.position.set(0, 12, 0.1);
-            this.controls.target.set(0, 0, 0);
-            this.controls.update();
-          }
         };
         img.onerror = () => showToast('封面加载失败');
         img.src = url;
@@ -1440,6 +1980,17 @@
             this.setMode(newMode);
           };
         });
+        const subBtn = document.getElementById('btnVinylCover');
+        if (subBtn) {
+          subBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (this.mode === 'vinylcover') {
+              this.setMode('vinyl');
+            } else {
+              this.setMode('vinylcover');
+            }
+          });
+        }
         document.getElementById('btnSettings').onclick = ()=> { document.getElementById('settingsPanel').classList.add('open'); this.log('打开设置'); };
         document.getElementById('btnCloseSettings').onclick = ()=> { document.getElementById('settingsPanel').classList.remove('open'); this.log('关闭设置'); };
         const fileInput = document.getElementById('fileInput');
@@ -1459,7 +2010,7 @@
         document.getElementById('barCount').oninput = e => { this.spectrum.setCount(+e.target.value); this.applyModeVisibility(); this.log('频谱柱数: ' + e.target.value); };
         document.getElementById('bloomToggle').onchange = e => { this.bloomPass.enabled = e.target.checked; this.log('辉光: ' + (e.target.checked ? '开' : '关')); };
         document.getElementById('autoRotateToggle').onchange = e => { 
-          this.controls.autoRotate = e.target.checked && this.mode !== 'vinyl';
+          this.controls.autoRotate = e.target.checked && this.mode !== 'vinyl' && this.mode !== 'vinylcover';
           this.log('自动旋转: ' + (e.target.checked ? '开' : '关')); 
         };
         const perfToggle = document.getElementById('perfModeToggle');
@@ -1471,7 +2022,7 @@
           } else { this.perfMode = false; this.updateSliderLimits(false); this.perfMonitorEl?.classList.remove('perf-large'); this.log('性能模式关闭'); }
         });
         document.getElementById('styleSwitchBtn').addEventListener('click', () => {
-          window.open('https://tuneviz.github.io/HOME');
+          window.open('https://www.example.com', '_blank');
           this.log('跳转网页');
         });
         if (this.perfMonitorEl) {
@@ -1510,7 +2061,17 @@
         this.updatePerformanceMonitor(now);
         const dt = Math.min(0.1, this.clock.getDelta());
         this.audio.updateFreq(); this.audio.updateTime();
-        const beat = this.audio.detectBeat();
+        const beatInfo = this.audio.detectBeat();
+        const beat = beatInfo.isBeat;
+        const beatStrength = beatInfo.strength;
+
+        const shouldShowHifi = this.audio.isPlaying && this.playlist.currentIndex !== -1;
+        if (shouldShowHifi !== this._hifiShown) {
+          this._hifiShown = shouldShowHifi;
+          const hifiEl = document.getElementById('hifiTag');
+          if (hifiEl) hifiEl.classList.toggle('visible', shouldShowHifi);
+        }
+
         if (this.audio.isPlaying && !this.isDragging) {
           const p = this.audio.getProgress();
           document.getElementById('progressFill').style.width = `${p*100}%`;
@@ -1520,27 +2081,35 @@
           if (this.lyricEnabled) this.lyrics.update(this.audio.getTime());
         }
         const shakeOn = document.getElementById('shakeToggle')?.checked ?? true;
-        const intensity = +document.getElementById('shakeIntensity')?.value || 0.8;
-        if (beat && shakeOn) this.shakeAmount = intensity * 0.8;
+        if (!shakeOn) this.shakeAmount = 0;
         this.shakeAmount *= 0.88;
         if (this.shakePass) {
           this.shakePass.uniforms.uShakeX.value = (Math.random()-0.5)*this.shakeAmount*0.02;
           this.shakePass.uniforms.uShakeY.value = (Math.random()-0.5)*this.shakeAmount*0.02;
         }
         this.controls.update();
+
         if (this.mode === 'vinyl') {
-          if (this.vinylGroup) {
-            this.vinylGroup.rotation.y += dt * 0.3;
+          if (this.vinylGroup) this.vinylGroup.rotation.y += dt * 0.3;
+        } else if (this.mode === 'vinylcover') {
+          if (this.bigCoverGroup) this.bigCoverGroup.rotation.y += dt * 0.15;
+          if (beat && this.burstParticles) {
+            const burstCount = Math.floor(30 + beatStrength * 100);
+            const speedMul = 0.5 + beatStrength * 1.5;
+            this.burstParticles.burst(burstCount, 0, 0, this.bigCoverRadius + 0.05, this.lastCoverColor, speedMul);
           }
         } else {
           const szMul = +document.getElementById('particleSize')?.value || 0.7;
           if (this.mode !== 'spectrum') this.particles.update(dt, this.audio.freqData, beat, szMul);
-          if (this.mode !== 'particle' && this.mode !== 'vinyl') {
+          if (this.mode !== 'particle') {
             const gain = +document.getElementById('spectrumGain')?.value || 4.0;
             const smooth = +document.getElementById('spectrumSmooth')?.value || 0.55;
             this.spectrum.update(this.audio.freqData, gain, smooth);
           }
         }
+
+        if (this.burstParticles) this.burstParticles.update(dt);
+
         this.bloomPass.strength = document.getElementById('bloomToggle')?.checked ? 0.6 : 0.0;
         this.composer.render();
         if (this.audio.duration) document.getElementById('durationLabel').textContent = this.audio.fmt(this.audio.duration);
