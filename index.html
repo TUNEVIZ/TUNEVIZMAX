@@ -82,39 +82,6 @@ tuneviz.github.io/home
     }
     .mode-btn:hover{color:white}
     .mode-btn.active{background:rgba(40,40,65,0.8);color:white;box-shadow:0 4px 10px rgba(0,0,0,0.3)}
-    .vinyl-btn-wrapper{position: relative; display: inline-block;}
-    .sub-btn{
-      position: absolute;
-      top: 100%;
-      left: 0;
-      right: 0;
-      margin-top: 6px;
-      padding: 6px 10px;
-      border-radius: 10px;
-      border: 1px solid var(--glass-border);
-      background: var(--glass-bg);
-      backdrop-filter: blur(20px);
-      color: var(--text-secondary);
-      font-size: 0.75rem;
-      cursor: pointer;
-      opacity: 0;
-      transform: translateY(-6px);
-      pointer-events: none;
-      transition: opacity 0.25s ease, transform 0.25s ease, background 0.2s ease;
-      white-space: nowrap;
-      z-index: 200;
-    }
-    .sub-btn.visible{
-      opacity: 1;
-      transform: translateY(0);
-      pointer-events: auto;
-    }
-    .sub-btn:hover{background: var(--glass-bg-hover); color: white;}
-    .sub-btn.active{
-      background: rgba(92,156,230,0.45);
-      color: white;
-      border-color: rgba(92,156,230,0.8);
-    }
     .progress-wrapper{
       width: 100%;
       max-width: 700px;
@@ -300,10 +267,7 @@ tuneviz.github.io/home
         <button class="mode-btn active" data-mode="particle">粒子</button>
         <button class="mode-btn" data-mode="spectrum">频谱</button>
         <button class="mode-btn" data-mode="both">混合</button>
-        <div class="vinyl-btn-wrapper">
-          <button class="mode-btn" data-mode="vinyl">黑胶</button>
-          <button class="sub-btn" id="btnVinylCover">封面</button>
-        </div>
+        <button class="mode-btn" data-mode="vinyl">黑胶</button>
       </div>
     </div>
     <div style="flex:1;"></div>
@@ -357,7 +321,7 @@ tuneviz.github.io/home
       <div class="setting-group" style="margin-top:10px;"><span class="setting-label">音调</span><input type="range" class="setting-slider" id="pitchSlider" min="0.5" max="1.5" value="1.0" step="0.01"></div>
     </div>
     <div class="setting-divider"></div>
-    <button class="style-btn" id="styleSwitchBtn">切换播放器</button>
+    <button class="style-btn" id="styleSwitchBtn">切换播放器样式（整体）</button>
   </div>
 
   <script type="module">
@@ -768,9 +732,7 @@ tuneviz.github.io/home
           this.lyricCallback?.([]);
           return;
         }
-        // 1) 完全同名
         let matchIdx = this.lyrics.findIndex(l => l.name === songName);
-        // 2) 忽略大小写
         if (matchIdx === -1) {
           const lower = songName.toLowerCase();
           matchIdx = this.lyrics.findIndex(l => l.name.toLowerCase() === lower);
@@ -1330,14 +1292,14 @@ tuneviz.github.io/home
           const a = Math.random() * Math.PI * 2;
           const px = centerX + Math.cos(a) * radius;
           const pz = centerZ + Math.sin(a) * radius;
-          const py = (Math.random() - 0.5) * 0.6;
+          const py = 0.15 + Math.random() * 0.3;
 
           this.positions[i*3] = px;
           this.positions[i*3+1] = py;
           this.positions[i*3+2] = pz;
 
           const speed = (2.5 + Math.random() * 4.0) * speedMul;
-          const vy = (Math.random() - 0.15) * 2.5 * speedMul;
+          const vy = (1.2 + Math.random() * 2.0) * speedMul;
           this.velocities[i*3] = Math.cos(a) * speed;
           this.velocities[i*3+1] = vy;
           this.velocities[i*3+2] = Math.sin(a) * speed;
@@ -1347,7 +1309,8 @@ tuneviz.github.io/home
             this.colors[i*3+1] = Math.min(1, baseColor.g * 1.4 + 0.25);
             this.colors[i*3+2] = Math.min(1, baseColor.b * 1.4 + 0.25);
           } else {
-            const c = new THREE.Color().setHSL(Math.random(), 0.9, 0.65);
+            // 蓝色系默认
+            const c = new THREE.Color().setHSL(0.55 + Math.random() * 0.13, 0.9, 0.65);
             this.colors[i*3] = c.r;
             this.colors[i*3+1] = c.g;
             this.colors[i*3+2] = c.b;
@@ -1443,17 +1406,12 @@ tuneviz.github.io/home
         this.vinylParticleTypes = null;
         this.vinylParticleCount = 0;
         this.vinylCoverRadius = 3.3;
+        this.vinylOuterRadius = 5.0; // 黑胶外边缘半径，用于喷发
 
-        this.bigCoverGroup = null;
-        this.bigCoverMesh = null;
-        this.bigCoverTopMat = null;
-        this.bigCoverRadius = 4.5;
         this.lastCoverColor = null;
-
         this.burstParticles = null;
 
         try { this.initVinylModel(); } catch(e) { console.error('initVinylModel 失败:', e); }
-        try { this.initBigCover(); } catch(e) { console.error('initBigCover 失败:', e); }
         try { this.initBurstParticles(); } catch(e) { console.error('initBurstParticles 失败:', e); }
         this.init();
       }
@@ -1642,53 +1600,6 @@ tuneviz.github.io/home
         }
         this.vinylParticles.geometry.attributes.color.needsUpdate = true;
       }
-      initBigCover() {
-        this.bigCoverGroup = new THREE.Group();
-
-        const radius = this.bigCoverRadius;
-        const thickness = 0.7;
-        const geo = new THREE.CylinderGeometry(radius, radius, thickness, 96, 1, false);
-
-        const sideMat = new THREE.MeshStandardMaterial({
-          color: 0x0a0a14,
-          roughness: 0.35,
-          metalness: 0.9,
-          emissive: 0x111122,
-          emissiveIntensity: 0.25
-        });
-        this.bigCoverTopMat = new THREE.MeshStandardMaterial({
-          color: 0x2a2a35,
-          roughness: 0.55,
-          metalness: 0.1,
-          side: THREE.FrontSide
-        });
-        const bottomMat = new THREE.MeshBasicMaterial({ color: 0x0a0a12, side: THREE.FrontSide });
-
-        this.bigCoverMesh = new THREE.Mesh(geo, [sideMat, this.bigCoverTopMat, bottomMat]);
-        this.bigCoverMesh.rotation.y = Math.PI / 2;
-        this.bigCoverGroup.add(this.bigCoverMesh);
-
-        this.bigCoverGroup.visible = false;
-        this.scene.add(this.bigCoverGroup);
-      }
-      updateBigCoverTexture(url) {
-        if (!this.bigCoverTopMat) return;
-        if (!url) {
-          this.bigCoverTopMat.map = null;
-          this.bigCoverTopMat.color.set(0x2a2a35);
-          this.bigCoverTopMat.needsUpdate = true;
-          return;
-        }
-        const img = new Image();
-        img.onload = () => {
-          const tex = new THREE.Texture(img);
-          tex.needsUpdate = true;
-          this.bigCoverTopMat.map = tex;
-          this.bigCoverTopMat.color.set(0xffffff);
-          this.bigCoverTopMat.needsUpdate = true;
-        };
-        img.src = url;
-      }
       initBurstParticles() {
         this.burstParticles = new BurstParticles(this.scene, 4000);
       }
@@ -1739,8 +1650,7 @@ tuneviz.github.io/home
         if (this.particles.points) this.particles.points.visible = showGlobalParticles;
         this.spectrum.setVisible(showSpectrum);
         if (this.vinylGroup) this.vinylGroup.visible = (this.mode === 'vinyl');
-        if (this.bigCoverGroup) this.bigCoverGroup.visible = (this.mode === 'vinylcover');
-        if (this.mode === 'vinyl' || this.mode === 'vinylcover') {
+        if (this.mode === 'vinyl') {
           this.controls.autoRotate = false;
         } else {
           this.controls.autoRotate = document.getElementById('autoRotateToggle')?.checked ?? true;
@@ -1750,18 +1660,8 @@ tuneviz.github.io/home
         this.mode = newMode;
         this.applyModeVisibility();
 
-        const subBtn = document.getElementById('btnVinylCover');
-        if (subBtn) {
-          const isVinylFamily = (newMode === 'vinyl' || newMode === 'vinylcover');
-          subBtn.classList.toggle('visible', isVinylFamily);
-          subBtn.classList.toggle('active', newMode === 'vinylcover');
-        }
-
         if (this.mode === 'vinyl') {
           this.camera.position.set(0, 12, 0.01);
-          this.controls.target.set(0, 0, 0);
-        } else if (this.mode === 'vinylcover') {
-          this.camera.position.set(0, 9, 4.0);
           this.controls.target.set(0, 0, 0);
         } else if (this.mode === 'spectrum' || this.mode === 'both') {
           this.camera.position.set(0, 12, 0.1);
@@ -1856,7 +1756,6 @@ tuneviz.github.io/home
           this.spectrum.clearCover();
           this.particles.clearCover();
           this.clearVinylCoverParticleColors();
-          this.updateBigCoverTexture(null);
           this.lastCoverColor = null;
           this.log('清除封面');
           return;
@@ -1885,7 +1784,6 @@ tuneviz.github.io/home
           this.spectrum.updateCoverColors(sample);
           this.particles.updateCoverColors(sample);
           this.updateVinylCoverParticleColors(sample);
-          this.updateBigCoverTexture(url);
           this.lastCoverColor = sample(0.5, 0.5);
           this.log('封面已加载');
         };
@@ -1980,17 +1878,6 @@ tuneviz.github.io/home
             this.setMode(newMode);
           };
         });
-        const subBtn = document.getElementById('btnVinylCover');
-        if (subBtn) {
-          subBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (this.mode === 'vinylcover') {
-              this.setMode('vinyl');
-            } else {
-              this.setMode('vinylcover');
-            }
-          });
-        }
         document.getElementById('btnSettings').onclick = ()=> { document.getElementById('settingsPanel').classList.add('open'); this.log('打开设置'); };
         document.getElementById('btnCloseSettings').onclick = ()=> { document.getElementById('settingsPanel').classList.remove('open'); this.log('关闭设置'); };
         const fileInput = document.getElementById('fileInput');
@@ -2010,7 +1897,7 @@ tuneviz.github.io/home
         document.getElementById('barCount').oninput = e => { this.spectrum.setCount(+e.target.value); this.applyModeVisibility(); this.log('频谱柱数: ' + e.target.value); };
         document.getElementById('bloomToggle').onchange = e => { this.bloomPass.enabled = e.target.checked; this.log('辉光: ' + (e.target.checked ? '开' : '关')); };
         document.getElementById('autoRotateToggle').onchange = e => { 
-          this.controls.autoRotate = e.target.checked && this.mode !== 'vinyl' && this.mode !== 'vinylcover';
+          this.controls.autoRotate = e.target.checked && this.mode !== 'vinyl';
           this.log('自动旋转: ' + (e.target.checked ? '开' : '关')); 
         };
         const perfToggle = document.getElementById('perfModeToggle');
@@ -2022,7 +1909,7 @@ tuneviz.github.io/home
           } else { this.perfMode = false; this.updateSliderLimits(false); this.perfMonitorEl?.classList.remove('perf-large'); this.log('性能模式关闭'); }
         });
         document.getElementById('styleSwitchBtn').addEventListener('click', () => {
-          window.open('https://tuneviz.github.io/HOME');
+          window.open('https://tuneviz.github.io/about/home');
           this.log('跳转网页');
         });
         if (this.perfMonitorEl) {
@@ -2091,12 +1978,11 @@ tuneviz.github.io/home
 
         if (this.mode === 'vinyl') {
           if (this.vinylGroup) this.vinylGroup.rotation.y += dt * 0.3;
-        } else if (this.mode === 'vinylcover') {
-          if (this.bigCoverGroup) this.bigCoverGroup.rotation.y += dt * 0.15;
+          // 鼓点时从黑胶外边缘喷发粒子
           if (beat && this.burstParticles) {
             const burstCount = Math.floor(30 + beatStrength * 100);
             const speedMul = 0.5 + beatStrength * 1.5;
-            this.burstParticles.burst(burstCount, 0, 0, this.bigCoverRadius + 0.05, this.lastCoverColor, speedMul);
+            this.burstParticles.burst(burstCount, 0, 0, this.vinylOuterRadius, this.lastCoverColor, speedMul);
           }
         } else {
           const szMul = +document.getElementById('particleSize')?.value || 0.7;
