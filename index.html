@@ -57,13 +57,14 @@ tuneviz.github.io/home
       background:var(--glass-bg);backdrop-filter:blur(28px) saturate(180%);
       -webkit-backdrop-filter:blur(28px) saturate(180%);border:1px solid var(--glass-border);
       border-radius:18px;padding:14px 20px;box-shadow:0 15px 35px rgba(0,0,0,0.5);
-      display:flex;align-items:center;gap:12px;transition:all 0.3s ease;cursor:pointer;
+      display:flex;align-items:center;gap:8px;transition:all 0.3s ease;cursor:pointer;
     }
     .glass-card:hover{background:var(--glass-bg-hover);transform:translateY(-2px)}
     .album-art{
       width:48px;height:48px;border-radius:10px;background:linear-gradient(135deg,#1e2a3a,#0f0f1e);
       display:flex;align-items:center;justify-content:center;font-size:26px;
-      border:1px solid rgba(255,255,255,0.2);
+      background-size: cover;background-position: center;
+      flex-shrink: 0;
     }
     .album-art.playing{animation:glowPulse 2s infinite}
     @keyframes glowPulse{0%,100%{box-shadow:0 0 20px rgba(92,156,230,0.5)}50%{box-shadow:0 0 40px rgba(240,123,92,0.8)}}
@@ -247,6 +248,15 @@ tuneviz.github.io/home
       text-align:center;
     }
     .style-btn:hover{background:rgba(255,255,255,0.2)}
+    .copyright{
+      color: var(--text-secondary);
+      font-size: 0.68rem;
+      text-align: center;
+      margin-top: 6px;
+      letter-spacing: 0.06em;
+      opacity: 0.65;
+      user-select: none;
+    }
   </style>
 </head>
 <body>
@@ -321,7 +331,8 @@ tuneviz.github.io/home
       <div class="setting-group" style="margin-top:10px;"><span class="setting-label">音调</span><input type="range" class="setting-slider" id="pitchSlider" min="0.5" max="1.5" value="1.0" step="0.01"></div>
     </div>
     <div class="setting-divider"></div>
-    <button class="style-btn" id="styleSwitchBtn">选择播放器样式</button>
+    <button class="style-btn" id="styleSwitchBtn">切换播放器</button>
+    <div class="copyright">©2026 TUNEVIZ 矽忈开发</div>
   </div>
 
   <script type="module">
@@ -574,17 +585,18 @@ tuneviz.github.io/home
         this._pauseTime = this.element.currentTime;
         this.updatePlayButton(false);
       }
+      // === 修复：虚拟起始时间方案，getTime 直接返回 elapsed，不再叠加 _pauseTime ===
       getTime() {
         if (this.isPlaying) {
           const elapsed = (performance.now() - this._startTime) * this._playbackRate / 1000;
-          return Math.min(this.duration, Math.max(0, this._pauseTime + elapsed));
+          return Math.min(this.duration, Math.max(0, elapsed));
         } else return this._pauseTime;
       }
       getProgress() { return this.duration ? Math.min(this.getTime()/this.duration,1) : 0; }
       setTime(seconds) {
         this.element.currentTime = seconds;
         this._pauseTime = seconds;
-        if (this.isPlaying) this._startTime = performance.now();
+        if (this.isPlaying) this._startTime = performance.now() - (seconds * 1000 / this._playbackRate);
       }
       updatePlayButton(playing) {
         document.getElementById('btnPlay').textContent = playing ? '⏸️' : '▶️';
@@ -663,12 +675,12 @@ tuneviz.github.io/home
       setPitch(val) {
         if (this._pitchDebounceTimer) clearTimeout(this._pitchDebounceTimer);
         this._pitchDebounceTimer = setTimeout(() => {
-          this._playbackRate = val;
           if (this.element) {
             const currentTime = this.getTime();
+            this._playbackRate = val;
             this.element.playbackRate = val;
             this._pauseTime = currentTime;
-            if (this.isPlaying) this._startTime = performance.now();
+            if (this.isPlaying) this._startTime = performance.now() - (currentTime * 1000 / val);
           }
         }, 150);
       }
@@ -684,6 +696,7 @@ tuneviz.github.io/home
         this.onSongChange = onSongChange;
         this.coverCallback = null;
         this.lyricCallback = null;
+        this.onArtistUpdate = null;
         this.activeTab = 'songs';
         this.loadedIndex = -1;
       }
@@ -725,7 +738,6 @@ tuneviz.github.io/home
         this.renderPanel();
         if (addedSong > 0) showToast('已导入歌曲，点击播放按钮开始播放');
       }
-      // === 自动匹配同名 lrc：先完全同名，再忽略大小写 ===
       _autoMatchLyric(songName) {
         if (!songName || this.lyrics.length === 0) {
           this.currentLyricIndex = -1;
@@ -745,20 +757,30 @@ tuneviz.github.io/home
           this.lyricCallback?.([]);
         }
       }
+      // === 从文件名解析歌手：优先 "歌手 - 歌名" 格式 ===
+      _extractArtistFromFilename(songName) {
+        if (!songName) return '';
+        const match = songName.match(/^(.+?)\s*-\s*(.+)$/);
+        if (match && match[1] && match[1].length <= 40) {
+          return match[1].trim();
+        }
+        return '';
+      }
       playSong(index) {
         if (index < 0 || index >= this.songs.length) return;
         this.currentIndex = index;
         const song = this.songs[index];
+        // 先用文件名解析的歌手临时占位
+        if (!song.artist) song.artist = this._extractArtistFromFilename(song.name);
         this.audio.playFile(song.file);
         this.loadedIndex = index;
         this.onSongChange?.(song);
 
-        // === 自动应用同名 lrc ===
         this._autoMatchLyric(song.name);
 
         this.renderPanel();
         if (this.coverCallback) this.coverCallback(null);
-        if (song.file.name.toLowerCase().endsWith('.mp3')) this.extractMP3Cover(song.file);
+        if (song.file.name.toLowerCase().endsWith('.mp3')) this.extractMP3Cover(song.file, song);
       }
       applyLyric(index) {
         if (index < 0 || index >= this.lyrics.length) return;
@@ -766,10 +788,16 @@ tuneviz.github.io/home
         if (this.lyricCallback) this.lyricCallback(this.lyrics[index].data);
         this.renderPanel();
       }
-      async extractMP3Cover(file) {
+      async extractMP3Cover(file, song) {
         if (window.jsmediatags) {
           window.jsmediatags.read(file, {
             onSuccess: (tag) => {
+              // 读歌手
+              if (tag.tags.artist && song) {
+                song.artist = tag.tags.artist;
+                this.onArtistUpdate?.(song.artist);
+              }
+              // 读封面
               const image = tag.tags.picture;
               if (image && image.data && image.data.length > 0) {
                 const blob = new Blob([new Uint8Array(image.data)], { type: image.format });
@@ -777,7 +805,9 @@ tuneviz.github.io/home
                 if (this.coverCallback) this.coverCallback(url);
               }
             },
-            onError: (error) => showToast('封面提取失败: ' + error.message)
+            onError: () => {
+              // 静默失败，不影响播放
+            }
           });
         }
       }
@@ -1309,7 +1339,6 @@ tuneviz.github.io/home
             this.colors[i*3+1] = Math.min(1, baseColor.g * 1.4 + 0.25);
             this.colors[i*3+2] = Math.min(1, baseColor.b * 1.4 + 0.25);
           } else {
-            // 蓝色系默认
             const c = new THREE.Color().setHSL(0.55 + Math.random() * 0.13, 0.9, 0.65);
             this.colors[i*3] = c.r;
             this.colors[i*3+1] = c.g;
@@ -1360,13 +1389,15 @@ tuneviz.github.io/home
         this.audio = new AudioEngine();
         this.playlist = new Playlist(this.audio, (song) => {
           document.getElementById('trackTitle').textContent = song.name;
-          document.getElementById('trackArtist').textContent = '播放列表中';
-          document.getElementById('albumArt').textContent = '🎧';
+          document.getElementById('trackArtist').textContent = song.artist ? ('-' + song.artist) : '';
         });
         this.playlist.coverCallback = (url) => this.handleCoverImage(url);
         this.playlist.lyricCallback = (lyrics) => {
           this.lyrics.setLyrics(lyrics);
           this.log('歌词已应用');
+        };
+        this.playlist.onArtistUpdate = (artist) => {
+          document.getElementById('trackArtist').textContent = artist ? ('-' + artist) : '';
         };
         this.playlist.lyricToggleEvent = () => {
           this.lyricEnabled = true;
@@ -1406,7 +1437,7 @@ tuneviz.github.io/home
         this.vinylParticleTypes = null;
         this.vinylParticleCount = 0;
         this.vinylCoverRadius = 3.3;
-        this.vinylOuterRadius = 5.0; // 黑胶外边缘半径，用于喷发
+        this.vinylOuterRadius = 5.0;
 
         this.lastCoverColor = null;
         this.burstParticles = null;
@@ -1752,11 +1783,15 @@ tuneviz.github.io/home
         }
       }
       handleCoverImage(url) {
+        const albumArt = document.getElementById('albumArt');
         if (!url) {
           this.spectrum.clearCover();
           this.particles.clearCover();
           this.clearVinylCoverParticleColors();
           this.lastCoverColor = null;
+          // 清空卡片封面
+          albumArt.style.backgroundImage = '';
+          albumArt.textContent = '🎵';
           this.log('清除封面');
           return;
         }
@@ -1785,6 +1820,11 @@ tuneviz.github.io/home
           this.particles.updateCoverColors(sample);
           this.updateVinylCoverParticleColors(sample);
           this.lastCoverColor = sample(0.5, 0.5);
+          // 设置卡片封面
+          albumArt.style.backgroundImage = `url(${url})`;
+          albumArt.style.backgroundSize = 'cover';
+          albumArt.style.backgroundPosition = 'center';
+          albumArt.textContent = '';
           this.log('封面已加载');
         };
         img.onerror = () => showToast('封面加载失败');
@@ -1978,7 +2018,6 @@ tuneviz.github.io/home
 
         if (this.mode === 'vinyl') {
           if (this.vinylGroup) this.vinylGroup.rotation.y += dt * 0.3;
-          // 鼓点时从黑胶外边缘喷发粒子
           if (beat && this.burstParticles) {
             const burstCount = Math.floor(30 + beatStrength * 100);
             const speedMul = 0.5 + beatStrength * 1.5;
